@@ -1,0 +1,25 @@
+---
+apiVersion: v2
+name: waxdemon
+description: Self-hosted Discogs collection dashboard (WaxDemon)
+type: application
+
+# Chart version. Bump on any chart/template change.
+# Versions follow Semantic Versioning (https://semver.org/).
+version: 0.1.0
+
+# Application version. Tracks the WaxDemon release.
+appVersion: "0.1.0"
+
+home: https://github.com/rtuszik/WaxDemon
+sources:
+    - https://github.com/rtuszik/WaxDemon
+keywords:
+    - discogs
+    - dashboard
+    - vinyl
+    - music
+    - rust
+maintainers:
+    - name: rtuszik
+      url: https://github.com/rtuszik

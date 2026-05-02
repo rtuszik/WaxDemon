@@ -1,0 +1,87 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/core",
+    "crates/db",
+    "crates/discogs",
+    "crates/sync",
+    "crates/scheduler",
+    "crates/server",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"
+license = "MIT"
+repository = "https://github.com/rtuszik/WaxDemon"
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1.40", features = ["full"] }
+
+# HTTP
+axum = { version = "0.8", features = ["macros"] }
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6", features = ["trace", "cors", "fs"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls", "stream"] }
+hyper = "1"
+http = "1"
+bytes = "1"
+mime = "0.3"
+url = "2.5"
+
+# Serde
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Database
+sqlx = { version = "0.8", default-features = false, features = [
+    "runtime-tokio",
+    "tls-rustls",
+    "postgres",
+    "chrono",
+    "migrate",
+    "macros",
+] }
+
+# Time
+chrono = { version = "0.4", default-features = false, features = ["serde", "clock"] }
+
+# Errors
+thiserror = "2"
+anyhow = "1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+
+# Misc
+rand = "0.9"
+futures-util = "0.3"
+async-trait = "0.1"
+
+# Scheduler
+tokio-cron-scheduler = "0.15"
+chrono-tz = "0.10"
+
+# Leptos
+leptos = { version = "0.8" }
+leptos_axum = "0.8"
+leptos_meta = "0.8"
+leptos_router = "0.8"
+wasm-bindgen = "0.2"
+
+# Testing
+wiremock = "0.6"
+axum-test = "20"
+insta = { version = "1.40", features = ["json", "yaml"] }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true
+
+[profile.dev]
+opt-level = 0

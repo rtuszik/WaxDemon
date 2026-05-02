@@ -1,0 +1,186 @@
+---
+name: Publish Docker Image and Helm Chart to GHCR
+
+on:
+    release:
+        types: [published]
+    workflow_dispatch:
+
+env:
+    REGISTRY_IMAGE: ghcr.io/${{ github.repository }}
+    CHART_REGISTRY: oci://ghcr.io/${{ github.repository }}
+    CHART_PATH: charts/waxdemon
+
+jobs:
+    build:
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - platform: linux/amd64
+                      runner: ubuntu-latest
+                    - platform: linux/arm64
+                      runner: ubuntu-24.04-arm
+        runs-on: ${{ matrix.runner }}
+        permissions:
+            contents: read
+            packages: write
+
+        steps:
+            - name: Prepare platform pair
+              run: |
+                platform=${{ matrix.platform }}
+                echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
+
+            - name: Checkout repository
+              uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+              with:
+                persist-credentials: false
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
+
+            - name: Log in to GitHub Container Registry
+              uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
+              with:
+                registry: ghcr.io
+                username: ${{ github.actor }}
+                password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Extract metadata (labels) for Docker
+              id: meta
+              uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6
+              with:
+                images: ${{ env.REGISTRY_IMAGE }}
+
+            - name: Build and push image by digest
+              id: build
+              uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7
+              with:
+                context: .
+                platforms: ${{ matrix.platform }}
+                labels: ${{ steps.meta.outputs.labels }}
+                outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+                cache-from: type=gha,scope=${{ env.PLATFORM_PAIR }}
+                cache-to: type=gha,mode=max,scope=${{ env.PLATFORM_PAIR }}
+
+            - name: Export digest
+              env:
+                STEPS_BUILD_OUTPUTS_DIGEST: ${{ steps.build.outputs.digest }}
+              run: |
+                mkdir -p /tmp/digests
+                digest="${STEPS_BUILD_OUTPUTS_DIGEST}"
+                touch "/tmp/digests/${digest#sha256:}"
+
+            - name: Upload digest
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+              with:
+                name: digests-${{ env.PLATFORM_PAIR }}
+                path: /tmp/digests/*
+                if-no-files-found: error
+                retention-days: 1
+
+    merge:
+        runs-on: ubuntu-latest
+        needs:
+            - build
+        permissions:
+            contents: read
+            packages: write
+
+        steps:
+            - name: Download digests
+              uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+              with:
+                path: /tmp/digests
+                pattern: digests-*
+                merge-multiple: true
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
+
+            - name: Log in to GitHub Container Registry
+              uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
+              with:
+                registry: ghcr.io
+                username: ${{ github.actor }}
+                password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Extract metadata (tags) for Docker
+              id: meta
+              uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6
+              with:
+                images: ${{ env.REGISTRY_IMAGE }}
+                tags: |
+                    type=sha
+                    type=semver,pattern={{version}}
+                    type=semver,pattern={{major}}.{{minor}}
+                    type=raw,value=latest,enable={{is_default_branch}}
+
+            - name: Create manifest list and push
+              working-directory: /tmp/digests
+              run: |
+                docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+                    $(printf "${REGISTRY_IMAGE}@sha256:%s " *)
+
+            - name: Inspect image
+              run: |
+                docker buildx imagetools inspect ${REGISTRY_IMAGE}:${STEPS_META_OUTPUTS_VERSION}
+              env:
+                STEPS_META_OUTPUTS_VERSION: ${{ steps.meta.outputs.version }}
+
+    publish-chart:
+        runs-on: ubuntu-latest
+        needs:
+            - merge
+        # Only publish on GitHub Releases; workflow_dispatch has no tag to derive a chart version from.
+        if: github.event_name == 'release'
+        permissions:
+            contents: read
+            packages: write
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+              with:
+                persist-credentials: false
+
+            - name: Install Helm
+              uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5
+              with:
+                version: v3.16.4
+
+            - name: Derive chart version from release tag
+              id: version
+              run: |
+                TAG="${GITHUB_EVENT_RELEASE_TAG_NAME}"
+                VERSION="${TAG#v}"
+                if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+                    echo "Release tag '$TAG' does not parse to semver (expected vX.Y.Z or X.Y.Z)" >&2
+                    exit 1
+                fi
+                echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+              env:
+                GITHUB_EVENT_RELEASE_TAG_NAME: ${{ github.event.release.tag_name }}
+
+            - name: Log in to GHCR (Helm)
+              run: |
+                echo "${{ secrets.GITHUB_TOKEN }}" \
+                    | helm registry login ghcr.io \
+                        --username "${GITHUB_ACTOR}" \
+                        --password-stdin
+
+            - name: Package chart
+              run: |
+                helm package "${CHART_PATH}" \
+                    --version "${STEPS_VERSION_OUTPUTS_VERSION}" \
+                    --app-version "${STEPS_VERSION_OUTPUTS_VERSION}" \
+                    --destination .
+              env:
+                STEPS_VERSION_OUTPUTS_VERSION: ${{ steps.version.outputs.version }}
+
+            - name: Push chart to GHCR as OCI artifact
+              run: |
+                helm push "waxdemon-${STEPS_VERSION_OUTPUTS_VERSION}.tgz" "${CHART_REGISTRY}"
+              env:
+                STEPS_VERSION_OUTPUTS_VERSION: ${{ steps.version.outputs.version }}

@@ -1,0 +1,23 @@
+[tools]
+oxfmt = "latest"
+rust = "latest"
+
+[tasks.fmt]
+description = "Apply rustfmt, oxfmt across the workspace"
+run = ["cargo fmt --all", "oxfmt"]
+
+[tasks.fmt-check]
+description = "Fail if rustfmt or oxfmt would change anything (CI parity)"
+run = ["cargo fmt --all -- --check", "oxfmt --check"]
+
+[tasks.clippy]
+description = "Clippy with -D warnings across all targets"
+run = "cargo clippy --workspace --all-targets -- -D warnings"
+
+[tasks.test]
+description = "Run the full test suite. Needs TEST_DATABASE_URL for db-backed tests."
+run = "cargo test --workspace -- --test-threads=1"
+
+[tasks.ci]
+description = "Full pre-push check: format, clippy, build, test"
+depends = ["fmt-check", "clippy", "test"]

@@ -1,0 +1,14 @@
+# Rust build artifacts
+/target
+**/*.rs.bk
+Cargo.lock.bak
+
+# Misc
+.DS_Store
+*.pem
+
+# Env files (opt-in for committing)
+.env
+
+# Database files (local dev)
+.db/

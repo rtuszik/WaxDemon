@@ -1,0 +1,20 @@
+[package]
+name = "waxdemon-scheduler"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+waxdemon-sync = { path = "../sync" }
+waxdemon-db = { path = "../db" }
+waxdemon-discogs = { path = "../discogs" }
+tokio = { workspace = true }
+tokio-cron-scheduler = { workspace = true }
+chrono = { workspace = true }
+chrono-tz = { workspace = true }
+tracing = { workspace = true }
+anyhow = { workspace = true }

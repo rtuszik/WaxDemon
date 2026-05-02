@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "waxdemon.fullname" . }}-test-connection"
+  labels:
+    {{- include "waxdemon.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['-q', '-O-', '{{ include "waxdemon.fullname" . }}:{{ .Values.service.port }}/api/collection/sync/status']
+  restartPolicy: Never

@@ -1,0 +1,4 @@
+{
+    "ignorePatterns": ["**/*.min.js", "**/*.min.css", "charts/**/templates/**"],
+    "tabWidth": 4
+}

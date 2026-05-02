@@ -1,0 +1,47 @@
+[graph]
+targets = []
+all-features = false
+no-default-features = false
+
+[advisories]
+version = 2
+yanked = "warn"
+ignore = [
+    # `rsa` crate Marvin timing sidechannel — reachable only if Postgres is
+    # configured with RSA-based SASL auth. WaxDemon uses SCRAM-SHA-256.
+    "RUSTSEC-2023-0071",
+    # `paste` proc-macro crate unmaintained; pulled in transitively by Leptos 0.7.
+    # Tracking upstream removal in leptos.
+    "RUSTSEC-2024-0436",
+]
+
+[licenses]
+version = 2
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-DFS-2016",
+    "Unicode-3.0",
+    "MPL-2.0",
+    "Zlib",
+    "CC0-1.0",
+    "OpenSSL",
+    "BSL-1.0",
+    # Mozilla's `webpki-roots` bundle. Pulled in transitively via rustls +
+    # sqlx + reqwest. CDLA-Permissive-2.0 is an OSI-style permissive license
+    # covering the trust root data itself; the Rust code is dual-licensed.
+    "CDLA-Permissive-2.0",
+]
+confidence-threshold = 0.8
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

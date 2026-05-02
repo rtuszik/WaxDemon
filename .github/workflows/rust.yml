@@ -1,0 +1,107 @@
+name: Rust CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: ddtest
+          POSTGRES_PASSWORD: ddtest
+          POSTGRES_DB: waxdemon_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      TEST_DATABASE_URL: postgres://ddtest:ddtest@localhost:5432/waxdemon_test
+      CARGO_TERM_COLOR: always
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_INCREMENTAL: "0"
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Toolchain info
+        run: rustc --version && cargo --version
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+
+      - name: Format check
+        run: cargo fmt --all -- --check
+
+      - name: Build core
+        run: cargo build -p waxdemon-core --verbose
+
+      - name: Build discogs
+        run: cargo build -p waxdemon-discogs --verbose
+
+      - name: Build db
+        run: cargo build -p waxdemon-db --verbose
+
+      - name: Build sync
+        run: cargo build -p waxdemon-sync --verbose
+
+      - name: Build scheduler
+        run: cargo build -p waxdemon-scheduler --verbose
+
+      - name: Build server
+        run: cargo build -p waxdemon-server --verbose
+
+      - name: Build tests
+        run: cargo build --workspace --tests --verbose
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Wait for postgres
+        run: |
+          for i in $(seq 1 30); do
+            if pg_isready -h localhost -p 5432 -U ddtest; then break; fi
+            echo "waiting for postgres ($i)"; sleep 2
+          done
+          pg_isready -h localhost -p 5432 -U ddtest
+
+      - name: Test core
+        run: cargo test -p waxdemon-core --verbose -- --test-threads=1
+
+      - name: Test discogs
+        run: cargo test -p waxdemon-discogs --verbose -- --test-threads=1
+
+      - name: Test db
+        run: cargo test -p waxdemon-db --verbose -- --test-threads=1
+
+      - name: Test sync
+        run: cargo test -p waxdemon-sync --verbose -- --test-threads=1
+
+      - name: Test scheduler
+        run: cargo test -p waxdemon-scheduler --verbose -- --test-threads=1
+
+      - name: Test server
+        run: cargo test -p waxdemon-server --verbose -- --test-threads=1

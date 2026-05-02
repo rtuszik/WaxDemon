@@ -1,0 +1,49 @@
+[package]
+name = "waxdemon-server"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "waxdemon"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+axum = { workspace = true }
+bytes = { workspace = true }
+chrono = { workspace = true }
+waxdemon-core = { path = "../core" }
+waxdemon-db = { path = "../db" }
+waxdemon-discogs = { path = "../discogs" }
+waxdemon-scheduler = { path = "../scheduler" }
+waxdemon-sync = { path = "../sync" }
+futures-util = { workspace = true }
+http = { workspace = true }
+hyper = { workspace = true }
+leptos = { workspace = true, features = ["ssr"] }
+leptos_meta = { workspace = true, features = ["ssr"] }
+mime = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+url = { workspace = true }
+urlencoding = "2"
+
+[dev-dependencies]
+axum-test = { workspace = true }
+insta = { workspace = true }
+sqlx = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+urlencoding = "2"
+wiremock = { workspace = true }

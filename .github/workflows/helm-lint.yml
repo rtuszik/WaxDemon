@@ -1,0 +1,48 @@
+---
+name: Helm Chart Lint
+
+on:
+    pull_request:
+        paths:
+            - "charts/**"
+            - ".github/workflows/helm-lint.yml"
+    workflow_dispatch:
+
+concurrency:
+    group: helm-lint-${{ github.ref }}
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+
+jobs:
+    lint:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+              with:
+                persist-credentials: false
+
+            - name: Install Helm
+              uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5
+              with:
+                version: v3.16.4
+
+            - name: helm lint
+              run: |
+                helm lint charts/waxdemon \
+                    --set secrets.databaseUrl=postgres://lint:lint@localhost/lint
+
+            - name: helm template (inline secret + defaults)
+              run: |
+                helm template waxdemon charts/waxdemon \
+                    --set secrets.databaseUrl=postgres://lint:lint@localhost/lint
+
+            - name: helm template (existingSecret + ingress + autoscaling + httpRoute)
+              run: |
+                helm template waxdemon charts/waxdemon \
+                    --set secrets.existingSecret=waxdemon-secrets \
+                    --set ingress.enabled=true \
+                    --set autoscaling.enabled=true \
+                    --set httpRoute.enabled=true
