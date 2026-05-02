@@ -15,8 +15,7 @@
                 if (!r.ok) throw new Error("status " + r.status);
                 const j = await r.json();
                 if (j.status === "running") {
-                    progress.textContent =
-                        "Syncing " + j.currentItem + " / " + j.totalItems;
+                    progress.textContent = "Syncing " + j.currentItem + " / " + j.totalItems;
                 } else if (j.status === "idle") {
                     progress.textContent = "Sync complete.";
                     clearInterval(polling);
@@ -24,8 +23,7 @@
                     btn.disabled = false;
                     setTimeout(() => location.reload(), 1200);
                 } else if (j.status === "error") {
-                    progress.textContent =
-                        "Sync failed: " + (j.lastError || "unknown");
+                    progress.textContent = "Sync failed: " + (j.lastError || "unknown");
                     clearInterval(polling);
                     polling = null;
                     btn.disabled = false;
@@ -158,10 +156,7 @@
             series: [
                 {
                     name: "Items",
-                    data: history.map((p) => [
-                        Date.parse(p.timestamp),
-                        p.count,
-                    ]),
+                    data: history.map((p) => [Date.parse(p.timestamp), p.count]),
                 },
             ],
             title: {
@@ -246,9 +241,7 @@
                                 label: "Total",
                                 color: "#a3a3a3",
                                 formatter: (w) =>
-                                    w.globals.seriesTotals
-                                        .reduce((a, b) => a + b, 0)
-                                        .toString(),
+                                    w.globals.seriesTotals.reduce((a, b) => a + b, 0).toString(),
                             },
                         },
                     },

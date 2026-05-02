@@ -1,7 +1,7 @@
 use crate::{error::AppError, state::AppState};
 use axum::{extract::State, Json};
-use waxdemon_sync::run::{run_collection_sync, SyncConfig};
 use serde::Serialize;
+use waxdemon_sync::run::{run_collection_sync, SyncConfig};
 
 #[derive(Serialize)]
 pub struct Response {

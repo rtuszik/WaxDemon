@@ -1,6 +1,6 @@
+use std::collections::HashMap;
 use waxdemon_discogs::PriceSuggestion;
 use waxdemon_sync::run::pick_suggested_value;
-use std::collections::HashMap;
 
 fn sugg(v: f64) -> PriceSuggestion {
     PriceSuggestion {

@@ -1,10 +1,10 @@
 use anyhow::Context;
+use tracing_subscriber::EnvFilter;
 use waxdemon_db::{init_pool, run_migrations};
 use waxdemon_discogs::client::Client;
 use waxdemon_scheduler::{effective_schedule, setup_scheduler};
 use waxdemon_server::{config::Config, router, AppState};
 use waxdemon_sync::run::SyncConfig;
-use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

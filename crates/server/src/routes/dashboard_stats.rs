@@ -4,10 +4,10 @@ use axum::{
     Json,
 };
 use chrono::Utc;
+use serde::Deserialize;
 use waxdemon_core::{
     build_dashboard_stats, time_range_filter, DashboardStats, DbItem, HistoryRow, TimeRange,
 };
-use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Default)]
 pub struct Params {

@@ -1,10 +1,10 @@
 //! Tests for `GET /api/collection/sync/status`.
 
 use axum_test::TestServer;
+use sqlx::postgres::PgPoolOptions;
 use waxdemon_db::{run_migrations, set_setting};
 use waxdemon_discogs::client::Client;
 use waxdemon_server::{router, AppState};
-use sqlx::postgres::PgPoolOptions;
 
 async fn fresh_state() -> Option<AppState> {
     let url = std::env::var("TEST_DATABASE_URL").ok()?;

@@ -1,9 +1,9 @@
 //! Integration tests for the image proxy route.
 
 use axum_test::TestServer;
+use sqlx::postgres::PgPoolOptions;
 use waxdemon_discogs::client::Client;
 use waxdemon_server::{router, AppState};
-use sqlx::postgres::PgPoolOptions;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 

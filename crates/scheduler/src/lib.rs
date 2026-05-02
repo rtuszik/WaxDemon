@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
+use tokio_cron_scheduler::{Job, JobScheduler};
+use tracing::{error, info, warn};
 use waxdemon_db::{get_setting, Db};
 use waxdemon_discogs::client::Client;
 use waxdemon_sync::run::{run_collection_sync, SyncConfig};
-use tokio_cron_scheduler::{Job, JobScheduler};
-use tracing::{error, info, warn};
 
 pub const DEFAULT_CRON_SCHEDULE: &str = "0 0 0 * * *";
 pub const TIMEZONE: &str = "Europe/Berlin";

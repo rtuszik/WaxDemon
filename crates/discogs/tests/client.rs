@@ -2,12 +2,12 @@
 
 use std::time::Duration;
 
+use serde_json::json;
+use tokio::time::Instant;
 use waxdemon_discogs::client::{
     extract_next_path, required_sleep, Client, PacerState, DEFAULT_FALLBACK_INTERVAL,
 };
 use waxdemon_discogs::{fetch_price_suggestions, DiscogsError};
-use serde_json::json;
-use tokio::time::Instant;
 use wiremock::matchers::{header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 

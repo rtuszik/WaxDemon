@@ -1,6 +1,8 @@
 //! End-to-end sync test: wiremock upstream + real Postgres.
 //! Gated on `TEST_DATABASE_URL`.
 
+use serde_json::json;
+use sqlx::postgres::PgPoolOptions;
 use waxdemon_db::{
     get_setting,
     items::{self},
@@ -9,8 +11,6 @@ use waxdemon_db::{
 };
 use waxdemon_discogs::client::Client;
 use waxdemon_sync::run::{run_collection_sync, SyncConfig};
-use serde_json::json;
-use sqlx::postgres::PgPoolOptions;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 

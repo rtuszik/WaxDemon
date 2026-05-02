@@ -1,6 +1,6 @@
+use std::sync::Arc;
 use waxdemon_db::Db;
 use waxdemon_discogs::client::Client;
-use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct AppState {

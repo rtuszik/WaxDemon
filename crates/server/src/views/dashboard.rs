@@ -4,10 +4,10 @@
 
 use crate::state::AppState;
 use chrono::Utc;
+use leptos::prelude::*;
 use waxdemon_core::{
     build_dashboard_stats, time_range_filter, DashboardStats, DbItem, HistoryRow, TimeRange,
 };
-use leptos::prelude::*;
 
 pub async fn render(st: &AppState) -> String {
     use leptos::prelude::RenderHtml;

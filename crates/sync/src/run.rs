@@ -1,4 +1,5 @@
 use chrono::Utc;
+use tracing::{error, info, warn};
 use waxdemon_core::{parse_currency, time_range::iso_z, CONDITION_ORDER};
 use waxdemon_db::{
     items::{self, UpsertItem},
@@ -11,7 +12,6 @@ use waxdemon_discogs::{
     fetch_collection_page, fetch_collection_value, fetch_price_suggestions,
     types::DiscogsReleaseBasic,
 };
-use tracing::{error, info, warn};
 
 #[derive(Debug, Clone)]
 pub struct SyncOutcome {

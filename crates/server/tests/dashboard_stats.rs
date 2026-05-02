@@ -1,6 +1,7 @@
 //! Gated on TEST_DATABASE_URL.
 
 use axum_test::TestServer;
+use sqlx::postgres::PgPoolOptions;
 use waxdemon_db::{
     items::{self, UpsertItem},
     run_migrations,
@@ -8,7 +9,6 @@ use waxdemon_db::{
 };
 use waxdemon_discogs::client::Client;
 use waxdemon_server::{router, AppState};
-use sqlx::postgres::PgPoolOptions;
 
 async fn fresh_state() -> Option<AppState> {
     let url = std::env::var("TEST_DATABASE_URL").ok()?;
