@@ -5,9 +5,19 @@
         "helpers:pinGitHubActionDigests",
         ":configMigration",
         "abandonments:recommended",
-        ":enablePreCommit"
+        ":enablePreCommit",
+        "mergeConfidence:all-badges"
     ],
     "prConcurrentLimit": 0,
     "rebaseWhen": "auto",
-    "labels": ["renovate"]
+    "labels": ["renovate"],
+    "osvVulnerabilityAlerts": true,
+    "minimumReleaseAge": "7 days",
+    "prCreation": "not-pending",
+    "packageRules": [
+        {
+            "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+            "automerge": true
+        }
+    ]
 }
