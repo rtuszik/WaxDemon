@@ -16,6 +16,21 @@
     "prCreation": "not-pending",
     "packageRules": [
         {
+            "matchUpdateTypes": ["patch"],
+            "addLabels": ["dependencies", "patch"],
+            "minimumReleaseAge": "7 days"
+        },
+        {
+            "matchUpdateTypes": ["minor"],
+            "addLabels": ["dependencies", "minor"],
+            "minimumReleaseAge": "7 days"
+        },
+        {
+            "matchUpdateTypes": ["major"],
+            "addLabels": ["dependencies", "major"],
+            "minimumReleaseAge": "30 days"
+        },
+        {
             "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
             "automerge": true
         }
