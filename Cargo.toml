@@ -23,7 +23,7 @@ tokio = { version = "1.40", features = ["full"] }
 # HTTP
 axum = { version = "0.8", features = ["macros"] }
 tower = { version = "0.5", features = ["util"] }
-tower-http = { version = "0.6", features = ["trace", "cors", "fs"] }
+tower-http = { version = "0.7", features = ["trace", "cors", "fs"] }
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls", "stream"] }
 hyper = "1"
 http = "1"
