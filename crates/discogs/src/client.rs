@@ -10,14 +10,10 @@ use tracing::{debug, info, warn};
 pub const DISCOGS_API_BASE_URL: &str = "https://api.discogs.com";
 pub const USER_AGENT: &str = "WaxDemonApp/0.1 (+https://github.com/rtuszik/waxdemon)";
 
-/// Fallback interval used only until we've seen our first response. Once the
-/// server reports `x-discogs-ratelimit`, pacing switches to that observed
-/// quota (60-second window).
 pub const DEFAULT_FALLBACK_INTERVAL: Duration = Duration::from_millis(1100);
 
-/// How long to wait when Discogs reports zero remaining quota. The window is
-/// a 60-second rolling window, so sleeping this long guarantees at least some
-/// quota has rolled back in.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
+
 const EMPTY_BUCKET_SLEEP: Duration = Duration::from_secs(60);
 
 #[derive(Debug, Clone, Default)]
@@ -29,8 +25,6 @@ pub struct PacerState {
     pub quota: Option<u32>,
 }
 
-/// Pure pacing decision — how long to sleep before firing the next request.
-/// Split out from the async path so we can unit-test the rules directly.
 pub fn required_sleep(st: &PacerState, fallback_interval: Duration, now: Instant) -> Duration {
     if matches!(st.remaining, Some(0)) {
         return EMPTY_BUCKET_SLEEP;
@@ -52,16 +46,8 @@ pub struct Client {
     token: String,
     pub max_retries: u32,
     pub initial_delay_ms: u64,
-    /// If true, skip actually sleeping between retries and between paced requests
-    /// (used for tests to keep them fast).
     pub disable_sleep: bool,
-    /// Fallback spacing between requests before the first response arrives or
-    /// when the server doesn't report a quota. Set to `Duration::ZERO` in tests.
     pub min_interval: Duration,
-    /// Shared pacer state — `last_request` timestamp plus the most recently
-    /// observed Discogs rate-limit headers. Sharing across clones is why this
-    /// is `Arc<Mutex<…>>`: a single `Client::new` produces one pacer that
-    /// covers every downstream task.
     pacer: Arc<Mutex<PacerState>>,
 }
 
@@ -74,6 +60,7 @@ impl Client {
         Self {
             http: reqwest::Client::builder()
                 .user_agent(USER_AGENT)
+                .timeout(REQUEST_TIMEOUT)
                 .build()
                 .expect("reqwest client"),
             base_url,
@@ -86,7 +73,6 @@ impl Client {
         }
     }
 
-    /// `endpoint` must start with `/` — it's appended to `base_url` verbatim.
     pub async fn request_json<T: for<'de> serde::Deserialize<'de>>(
         &self,
         endpoint: &str,
@@ -135,9 +121,6 @@ impl Client {
             }
 
             if status.as_u16() == 429 {
-                // A 429 implies the bucket is empty, regardless of what the
-                // header claimed. Force it so the next caller blocks long
-                // enough for the window to roll.
                 self.pacer.lock().await.remaining = Some(0);
 
                 let retry_after = response
@@ -154,7 +137,7 @@ impl Client {
                 break;
             }
 
-            // Non-429 errors are not retried — surface them to the caller.
+            // Non-429 errors are not retried
             let body = response.text().await.unwrap_or_default();
             return Err(DiscogsError::Http {
                 status: status.as_u16(),
@@ -170,17 +153,11 @@ impl Client {
         }))
     }
 
-    /// Serialise outbound requests so they leave at a rate consistent with the
-    /// most recently observed Discogs quota (`x-discogs-ratelimit`). Before
-    /// the first response, falls back to `self.min_interval`. The mutex is
-    /// held across the sleep so a second caller can't race past it.
     async fn wait_for_slot(&self) {
         let mut st = self.pacer.lock().await;
         let sleep_for = required_sleep(&st, self.min_interval, Instant::now());
         if !sleep_for.is_zero() && !self.disable_sleep {
             let ms = sleep_for.as_millis() as u64;
-            // Short per-request pacing is noise at INFO; the 60s empty-bucket
-            // wait is exactly the thing the user wants to see.
             if ms >= 5_000 {
                 info!(
                     sleep_ms = ms,
@@ -270,7 +247,6 @@ pub async fn fetch_collection_value(
         .await
 }
 
-/// Price suggestions. Returns `None` when Discogs responds 404 (no suggestions for this release).
 pub async fn fetch_price_suggestions(
     client: &Client,
     release_id: i64,
