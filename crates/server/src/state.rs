@@ -8,8 +8,6 @@ pub struct AppState {
     pub http: Arc<reqwest::Client>,
     pub discogs: Arc<Client>,
     pub discogs_username: Option<String>,
-    /// Allow-list prefix for the image proxy. Defaults to `https://i.discogs.com/`.
-    /// Overridable so integration tests can point the proxy at a local wiremock.
     pub image_proxy_prefix: String,
 }
 
@@ -29,5 +27,4 @@ impl AppState {
     }
 }
 
-pub const IMAGE_USER_AGENT: &str =
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36";
+pub const IMAGE_USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36";

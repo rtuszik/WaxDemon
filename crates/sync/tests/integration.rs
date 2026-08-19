@@ -1,6 +1,3 @@
-//! End-to-end sync test: wiremock upstream + real Postgres.
-//! Gated on `TEST_DATABASE_URL`.
-
 use serde_json::json;
 use sqlx::postgres::PgPoolOptions;
 use waxdemon_db::{
@@ -10,7 +7,7 @@ use waxdemon_db::{
     stats_history::{self},
 };
 use waxdemon_discogs::client::Client;
-use waxdemon_sync::run::{run_collection_sync, SyncConfig};
+use waxdemon_sync::run::{SyncConfig, run_collection_sync};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -39,7 +36,6 @@ async fn full_sync_happy_path() {
     };
     let upstream = MockServer::start().await;
 
-    // Collection page: one release, no next page.
     Mock::given(method("GET"))
         .and(path("/users/u1/collection/folders/0/releases"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
@@ -74,7 +70,6 @@ async fn full_sync_happy_path() {
         .mount(&upstream)
         .await;
 
-    // Collection value.
     Mock::given(method("GET"))
         .and(path("/users/u1/collection/value"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
@@ -86,7 +81,6 @@ async fn full_sync_happy_path() {
         .mount(&upstream)
         .await;
 
-    // Price suggestions.
     Mock::given(method("GET"))
         .and(path("/marketplace/price_suggestions/4242"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
@@ -108,7 +102,6 @@ async fn full_sync_happy_path() {
     let outcome = run_collection_sync(&pool, &client, &cfg).await.unwrap();
     assert_eq!(outcome.item_count, 1);
 
-    // Verify item persisted with chosen suggested_value.
     let rows = items::select_all(&pool).await.unwrap();
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].id, 9999);
@@ -116,7 +109,6 @@ async fn full_sync_happy_path() {
     assert_eq!(rows[0].title.as_deref(), Some("Blue Train"));
     assert!((rows[0].suggested_value.unwrap() - 42.42).abs() < 1e-4);
 
-    // Snapshot row with parsed value totals.
     let snap = stats_history::latest_snapshot(&pool)
         .await
         .unwrap()
@@ -126,7 +118,6 @@ async fn full_sync_happy_path() {
     assert!((snap.value_mean.unwrap() - 25.0).abs() < 1e-9);
     assert!((snap.value_max.unwrap() - 50.0).abs() < 1e-9);
 
-    // Status ended in idle and progress counters advanced.
     assert_eq!(
         get_setting(&pool, "sync_status").await.unwrap().as_deref(),
         Some("idle")

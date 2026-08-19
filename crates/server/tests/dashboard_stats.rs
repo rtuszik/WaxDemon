@@ -1,5 +1,3 @@
-//! Gated on TEST_DATABASE_URL.
-
 use axum_test::TestServer;
 use sqlx::postgres::PgPoolOptions;
 use waxdemon_db::{
@@ -8,7 +6,7 @@ use waxdemon_db::{
     stats_history::{self, StatsSnapshot},
 };
 use waxdemon_discogs::client::Client;
-use waxdemon_server::{router, AppState};
+use waxdemon_server::{AppState, router};
 
 async fn fresh_state() -> Option<AppState> {
     let url = std::env::var("TEST_DATABASE_URL").ok()?;
@@ -17,7 +15,6 @@ async fn fresh_state() -> Option<AppState> {
         .connect(&url)
         .await
         .ok()?;
-    // Reset schema to ensure test isolation.
     sqlx::query(
         "DROP TABLE IF EXISTS collection_items, collection_stats_history, settings, _sqlx_migrations",
     )
@@ -89,7 +86,6 @@ async fn populated_db_produces_stable_shape() {
         return;
     };
 
-    // Seed 4 items, mix of values/years/formats.
     items::upsert(
         &st.db,
         &item(
@@ -147,7 +143,6 @@ async fn populated_db_produces_stable_shape() {
     .await
     .unwrap();
 
-    // Two history snapshots.
     stats_history::insert_snapshot(
         &st.db,
         &StatsSnapshot {
@@ -179,15 +174,12 @@ async fn populated_db_produces_stable_shape() {
     let raw = resp.text();
     let body: serde_json::Value = serde_json::from_str(&raw).unwrap();
 
-    // totalItems = latest snapshot's total_items (4), not from a COUNT(*).
     assert_eq!(body["totalItems"], 4);
     assert_eq!(body["latestValueMin"], 0.5);
     assert_eq!(body["latestValueMean"], 10.0);
     assert_eq!(body["latestValueMax"], 25.5);
-    // averageValuePerItem = 10.0 / 4 = 2.5
     assert!((body["averageValuePerItem"].as_f64().unwrap() - 2.5).abs() < 1e-9);
 
-    // Top valuable items = sorted desc by suggested_value, limit 10.
     let top = body["topValuableItems"].as_array().unwrap();
     assert_eq!(top.len(), 4);
     assert_eq!(top[0]["release_id"], 101);
@@ -195,18 +187,14 @@ async fn populated_db_produces_stable_shape() {
     assert_eq!(top[3]["release_id"], 103);
     assert_eq!(top[3]["suggested_value"], 0.5);
 
-    // Latest additions sorted by added_date desc.
     let latest = body["latestAdditions"].as_array().unwrap();
     assert_eq!(latest[0]["release_id"], 104);
     assert_eq!(latest[3]["release_id"], 101);
 
-    // Genre distribution: Rock=2, Pop=2, Electronic=1.
     let genres = body["genreDistribution"].as_object().unwrap();
     assert_eq!(genres["Rock"], 2);
     assert_eq!(genres["Pop"], 2);
     assert_eq!(genres["Electronic"], 1);
-    // Wire ordering must be count-descending: the highest-count genre appears first
-    // in the raw JSON (tested against the pre-parse string).
     let gd_start = raw.find("\"genreDistribution\":{").unwrap();
     let gd_slice = &raw[gd_start..gd_start + 120];
     let rock_pos = gd_slice.find("Rock").unwrap();
@@ -216,13 +204,11 @@ async fn populated_db_produces_stable_shape() {
         "expected Rock to appear before Electronic in wire ordering, got: {gd_slice}"
     );
 
-    // History is ordered ascending by timestamp.
     let history = body["itemCountHistory"].as_array().unwrap();
     assert_eq!(history.len(), 2);
     assert_eq!(history[0]["timestamp"], "2024-01-01T10:00:00Z");
     assert_eq!(history[1]["timestamp"], "2024-04-01T10:00:00Z");
 
-    // Format distribution buckets: Vinyl=2, CD=1, File=1.
     let fmt = body["formatDistribution"].as_object().unwrap();
     assert_eq!(fmt["Vinyl"], 2);
     assert_eq!(fmt["CD"], 1);

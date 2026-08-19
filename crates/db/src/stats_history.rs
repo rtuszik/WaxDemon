@@ -34,7 +34,6 @@ const SELECT_FIELDS: &str = "timestamp, total_items,
     value_mean::DOUBLE PRECISION AS value_mean,
     value_max::DOUBLE PRECISION AS value_max";
 
-/// Latest snapshot.
 pub async fn latest_snapshot(pool: &Db) -> Result<Option<StatsSnapshot>, DbError> {
     let sql = format!(
         "SELECT {SELECT_FIELDS} FROM collection_stats_history ORDER BY timestamp DESC LIMIT 1"
@@ -45,7 +44,6 @@ pub async fn latest_snapshot(pool: &Db) -> Result<Option<StatsSnapshot>, DbError
     Ok(row)
 }
 
-/// Range query. `start_iso = None` returns all history ascending.
 pub async fn range_query(
     pool: &Db,
     start_iso: Option<&str>,

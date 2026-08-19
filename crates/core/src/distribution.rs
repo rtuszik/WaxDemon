@@ -1,4 +1,3 @@
-/// Primary-format bucket used in the format distribution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FormatBucket {
     Vinyl,
@@ -22,10 +21,6 @@ impl FormatBucket {
     }
 }
 
-/// Classify a raw format string (as stored in `collection_items.format`) into a bucket.
-///
-/// `None`/empty -> `Unknown`.
-/// Case-insensitive match order: Vinyl > CD > Cassette > File > Other.
 pub fn classify_format(format: Option<&str>) -> FormatBucket {
     let Some(raw) = format else {
         return FormatBucket::Unknown;

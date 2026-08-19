@@ -1,10 +1,8 @@
-//! Smoke test for the server-rendered dashboard page.
-
 use axum_test::TestServer;
 use sqlx::postgres::PgPoolOptions;
 use waxdemon_db::run_migrations;
 use waxdemon_discogs::client::Client;
-use waxdemon_server::{router, AppState};
+use waxdemon_server::{AppState, router};
 
 async fn fresh_state() -> Option<AppState> {
     let url = std::env::var("TEST_DATABASE_URL").ok()?;
@@ -47,7 +45,6 @@ async fn dashboard_page_renders_html_shell() {
         body.contains("id=\"sync-progress\""),
         "missing progress target"
     );
-    // Empty DB => zero totals.
     assert!(body.contains("Items"));
     assert!(
         body.contains("href=\"/favicon.ico\""),

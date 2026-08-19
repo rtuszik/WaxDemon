@@ -1,10 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-/// Ordered distribution map — preserves insertion order in the emitted JSON
-/// so the sort-by-count-desc ordering produced by the aggregator survives serialization.
-///
-/// Backed by a `Vec<(String, i64)>` serialized as a JSON object.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct OrderedDist(pub Vec<(String, i64)>);
 
@@ -36,7 +32,6 @@ impl Serialize for OrderedDist {
 
 impl<'de> Deserialize<'de> for OrderedDist {
     fn deserialize<D: serde::Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
-        // Deserialize as BTreeMap for stability when round-tripping tests.
         let m = BTreeMap::<String, i64>::deserialize(de)?;
         Ok(Self(m.into_iter().collect()))
     }

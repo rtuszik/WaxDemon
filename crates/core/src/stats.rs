@@ -3,7 +3,6 @@ use crate::types::{
     DashboardStats, ItemCountPoint, LatestAddition, OrderedDist, ValuableItem, ValuePoint,
 };
 
-/// Row shape matching the `SELECT ... FROM collection_items` query.
 #[derive(Debug, Clone)]
 pub struct DbItem {
     pub id: i64,
@@ -12,7 +11,6 @@ pub struct DbItem {
     pub title: Option<String>,
     pub year: Option<i32>,
     pub format: Option<String>,
-    /// JSON array string, e.g. `["Rock","Pop"]`
     pub genres: Option<String>,
     pub cover_image_url: Option<String>,
     pub condition: Option<String>,
@@ -20,7 +18,6 @@ pub struct DbItem {
     pub added_date: String,
 }
 
-/// Row shape matching `collection_stats_history` for the history query.
 #[derive(Debug, Clone)]
 pub struct HistoryRow {
     pub timestamp: String,
@@ -30,7 +27,6 @@ pub struct HistoryRow {
     pub value_max: Option<f64>,
 }
 
-/// Pure assembly function that turns raw DB rows into a `DashboardStats`.
 pub fn build_dashboard_stats(
     all_items: &[DbItem],
     latest_stats: Option<&HistoryRow>,
@@ -66,7 +62,6 @@ pub fn build_dashboard_stats(
         })
         .collect();
 
-    // Items with a positive suggested value, sorted descending & ascending.
     let mut with_value: Vec<&DbItem> = all_items
         .iter()
         .filter(|i| i.suggested_value.map(|v| v > 0.0).unwrap_or(false))
@@ -90,13 +85,11 @@ pub fn build_dashboard_stats(
     let least_valuable_items: Vec<ValuableItem> =
         with_value.iter().take(10).map(|i| to_valuable(i)).collect();
 
-    // Latest additions: all items sorted by added_date desc, top 10.
     let mut by_added: Vec<&DbItem> = all_items.iter().collect();
     by_added.sort_by(|a, b| b.added_date.cmp(&a.added_date));
     let latest_additions: Vec<LatestAddition> =
         by_added.iter().take(10).map(|i| to_latest(i)).collect();
 
-    // Distributions.
     let mut genre_counts: Vec<(String, i64)> = Vec::new();
     let mut year_counts: Vec<(String, i64)> = Vec::new();
     let mut format_counts: Vec<(String, i64)> = Vec::new();
@@ -128,7 +121,6 @@ pub fn build_dashboard_stats(
         }
     }
 
-    // Sort descending by count, preserve insertion-ordered dict for JSON.
     genre_counts.sort_by_key(|(_, c)| std::cmp::Reverse(*c));
     year_counts.sort_by_key(|(_, c)| std::cmp::Reverse(*c));
     format_counts.sort_by_key(|(_, c)| std::cmp::Reverse(*c));

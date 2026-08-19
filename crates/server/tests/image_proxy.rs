@@ -1,9 +1,7 @@
-//! Integration tests for the image proxy route.
-
 use axum_test::TestServer;
 use sqlx::postgres::PgPoolOptions;
 use waxdemon_discogs::client::Client;
-use waxdemon_server::{router, AppState};
+use waxdemon_server::{AppState, router};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -78,7 +76,6 @@ async fn happy_path_streams_bytes_with_cache_header() {
         .mount(&upstream)
         .await;
 
-    // Prefix the proxy on the mock server
     let prefix = format!("{}/", upstream.uri());
     let Some(st) = state_with_upstream(prefix.clone()).await else {
         eprintln!("skipping: TEST_DATABASE_URL not set");

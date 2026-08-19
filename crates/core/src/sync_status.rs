@@ -10,8 +10,6 @@ pub enum SyncStatus {
 }
 
 impl SyncStatus {
-    /// Parse from the value stored in the `settings` table.
-    /// Anything not in {idle,running,error} becomes `Unknown`.
     pub fn parse(s: Option<&str>) -> Self {
         match s.unwrap_or("") {
             "idle" => Self::Idle,

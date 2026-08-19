@@ -1,5 +1,3 @@
-//! Environment configuration loaded at server startup.
-
 #[derive(Debug, Clone)]
 pub struct Config {
     pub database_url: String,

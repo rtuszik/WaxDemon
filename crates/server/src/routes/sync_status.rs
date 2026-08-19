@@ -1,5 +1,5 @@
 use crate::{error::AppError, state::AppState};
-use axum::{extract::State, Json};
+use axum::{Json, extract::State};
 use waxdemon_core::{SyncStatus, SyncStatusResponse};
 
 pub async fn handler(State(st): State<AppState>) -> Result<Json<SyncStatusResponse>, AppError> {

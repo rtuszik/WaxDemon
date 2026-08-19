@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use tokio_cron_scheduler::{Job, JobScheduler};
 use tracing::{error, info, warn};
-use waxdemon_db::{get_setting, Db};
+use waxdemon_db::{Db, get_setting};
 use waxdemon_discogs::client::Client;
-use waxdemon_sync::run::{run_collection_sync, SyncConfig};
+use waxdemon_sync::run::{SyncConfig, run_collection_sync};
 
 pub const DEFAULT_CRON_SCHEDULE: &str = "0 0 0 * * *";
 pub const TIMEZONE: &str = "Europe/Berlin";
@@ -16,14 +16,10 @@ pub fn effective_schedule(env: Option<&str>) -> String {
     }
 }
 
-/// Cron tick should skip when the previous sync is still running. Advisory —
-/// a process crash mid-sync can leave `sync_status="running"` forever; fixing
-/// stale-lock recovery is out of scope here.
 pub fn should_skip_sync(status: Option<&str>) -> bool {
     matches!(status, Some("running"))
 }
 
-/// Spawn the sync cron job. The returned handle must be kept alive.
 pub async fn setup_scheduler(
     pool: Db,
     client: Client,

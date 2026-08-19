@@ -1,5 +1,5 @@
 use chrono::{TimeZone, Utc};
-use waxdemon_core::{time_range_filter, TimeRange};
+use waxdemon_core::{TimeRange, time_range_filter};
 
 #[test]
 fn parse_each_variant() {

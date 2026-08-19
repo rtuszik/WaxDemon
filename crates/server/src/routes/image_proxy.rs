@@ -2,7 +2,7 @@ use crate::{error::AppError, state::AppState};
 use axum::{
     body::Body,
     extract::{Query, State},
-    http::{header, HeaderMap, HeaderValue, StatusCode},
+    http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
 };
 use serde::Deserialize;
@@ -20,7 +20,6 @@ pub async fn handler(
         .url
         .ok_or_else(|| AppError::BadRequest("Missing image URL parameter".into()))?;
 
-    // Whitelist: only `https://i.discogs.com/`
     if url.starts_with('/') {
         return Err(AppError::BadRequest(
             "Proxying local files is not supported".into(),

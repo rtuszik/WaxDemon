@@ -1,16 +1,13 @@
 use axum::{
     body::Body,
     extract::Path,
-    http::{header, HeaderValue, StatusCode},
+    http::{HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
 };
 
 struct Asset {
     bytes: &'static [u8],
     content_type: &'static str,
-    /// `Cache-Control` value. Vendored libraries at a pinned version are
-    /// safe to cache for a year; first-party assets use a short TTL so
-    /// redeploys show up quickly.
     cache_control: &'static str,
 }
 

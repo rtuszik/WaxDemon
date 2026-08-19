@@ -6,7 +6,7 @@ pub mod sync_status;
 
 use crate::state::AppState;
 use crate::views;
-use axum::{routing::get, Router};
+use axum::{Router, routing::get};
 
 pub fn router(state: AppState) -> Router {
     Router::new()

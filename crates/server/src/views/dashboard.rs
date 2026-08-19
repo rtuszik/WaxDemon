@@ -1,12 +1,8 @@
-//! Server-rendered dashboard shell. Charts are rendered client-side by
-//! ApexCharts against `/api/dashboard-stats`; this view only produces the HTML
-//! skeleton and the static KPI / list sections.
-
 use crate::state::AppState;
 use chrono::Utc;
 use leptos::prelude::*;
 use waxdemon_core::{
-    build_dashboard_stats, time_range_filter, DashboardStats, DbItem, HistoryRow, TimeRange,
+    DashboardStats, DbItem, HistoryRow, TimeRange, build_dashboard_stats, time_range_filter,
 };
 
 pub async fn render(st: &AppState) -> String {

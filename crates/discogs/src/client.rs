@@ -19,9 +19,7 @@ const EMPTY_BUCKET_SLEEP: Duration = Duration::from_secs(60);
 #[derive(Debug, Clone, Default)]
 pub struct PacerState {
     pub last_request: Option<Instant>,
-    /// Most recently observed `x-discogs-ratelimit-remaining`.
     pub remaining: Option<u32>,
-    /// Most recently observed `x-discogs-ratelimit` (total quota per window).
     pub quota: Option<u32>,
 }
 
@@ -112,7 +110,6 @@ impl Client {
             let status = response.status();
             if status.is_success() {
                 if status.as_u16() == 204 {
-                    // 204 has no body; only valid when T deserializes from JSON null.
                     return serde_json::from_value::<T>(serde_json::Value::Null)
                         .map_err(DiscogsError::Parse);
                 }
@@ -137,7 +134,6 @@ impl Client {
                 break;
             }
 
-            // Non-429 errors are not retried
             let body = response.text().await.unwrap_or_default();
             return Err(DiscogsError::Http {
                 status: status.as_u16(),
@@ -173,9 +169,6 @@ impl Client {
         st.last_request = Some(Instant::now());
     }
 
-    /// Parse Discogs' rate-limit headers off a response and record the numbers
-    /// so the next `wait_for_slot` can pace adaptively. Missing or malformed
-    /// headers are ignored — we just keep the last known values.
     async fn record_rate_limit_headers(&self, headers: &reqwest::header::HeaderMap) {
         let remaining = header_u32(headers, "x-discogs-ratelimit-remaining");
         let quota = header_u32(headers, "x-discogs-ratelimit");
@@ -191,15 +184,11 @@ impl Client {
         }
     }
 
-    /// Snapshot of current pacer state — remaining quota and last-request time.
-    /// Cheap: clones three `Option`s. Useful for progress logging in callers.
     pub async fn pacer_snapshot(&self) -> PacerState {
         self.pacer.lock().await.clone()
     }
 
     async fn backoff(&self, attempt: u32, retry_after_secs: Option<u64>) {
-        // Exponential backoff: initial_delay * 2^attempt, plus 0–999ms jitter.
-        // If the server sent Retry-After, honour it when it exceeds our computed delay.
         let base = self.initial_delay_ms.saturating_mul(1u64 << attempt);
         let jitter = rand::rng().random_range(0..1000u64);
         let mut delay_ms = base + jitter;
@@ -223,7 +212,6 @@ fn header_u32(headers: &reqwest::header::HeaderMap, name: &str) -> Option<u32> {
         .and_then(|s| s.trim().parse::<u32>().ok())
 }
 
-/// Follow `pagination.urls.next` extracting `path + query` only.
 pub fn extract_next_path(next_url: &str) -> Option<String> {
     url::Url::parse(next_url).ok().map(|u| match u.query() {
         Some(q) => format!("{}?{}", u.path(), q),

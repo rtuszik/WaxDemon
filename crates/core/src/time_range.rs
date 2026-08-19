@@ -32,7 +32,6 @@ impl TimeRange {
     }
 }
 
-/// Return the lower-bound ISO-8601 timestamp for the given time range, or `None` for "all".
 pub fn time_range_filter(range: TimeRange, now: DateTime<Utc>) -> Option<String> {
     let days = match range {
         TimeRange::SevenDays => 7,
@@ -46,7 +45,6 @@ pub fn time_range_filter(range: TimeRange, now: DateTime<Utc>) -> Option<String>
     Some(iso_z(start))
 }
 
-/// Format like JS `Date#toISOString()`: `YYYY-MM-DDTHH:MM:SS.sssZ`.
 pub fn iso_z(dt: DateTime<Utc>) -> String {
     dt.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string()
 }

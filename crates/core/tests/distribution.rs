@@ -1,4 +1,4 @@
-use waxdemon_core::{classify_format, FormatBucket};
+use waxdemon_core::{FormatBucket, classify_format};
 
 #[test]
 fn none_is_unknown() {
@@ -21,9 +21,6 @@ fn vinyl_matches() {
         "10\" single",
         "12\" maxi",
     ] {
-        // All of the above strings, once lowercased, must hit the "vinyl|lp|ep|7\"|10\"|12\"" branch.
-        // EP/LP triggers require a leading space (to avoid false positives like "Helped"),
-        // so the inputs are padded with a leading space before classification.
         let padded = format!(" {}", s);
         assert_eq!(
             classify_format(Some(&padded)),

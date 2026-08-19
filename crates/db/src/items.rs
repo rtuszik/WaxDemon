@@ -1,7 +1,6 @@
 use crate::{error::DbError, pool::Db};
 use sqlx::Postgres;
 
-/// One-to-one with the `collection_items` table.
 #[derive(Debug, Clone)]
 pub struct UpsertItem {
     pub id: i32,
@@ -22,7 +21,6 @@ pub struct UpsertItem {
     pub last_value_check: Option<String>,
 }
 
-/// Row shape as read for dashboard stats.
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct CollectionItemRow {
     pub id: i32,
@@ -84,7 +82,6 @@ pub async fn delete_all<'e, E: sqlx::Executor<'e, Database = Postgres>>(
 }
 
 pub async fn select_all(pool: &Db) -> Result<Vec<CollectionItemRow>, DbError> {
-    // Cast REAL -> DOUBLE PRECISION so sqlx maps it directly to f64.
     let rows = sqlx::query_as::<_, CollectionItemRow>(
         "SELECT id, release_id, artist, title, year, format, genres, cover_image_url,
                 condition, suggested_value::DOUBLE PRECISION AS suggested_value, added_date

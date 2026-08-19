@@ -1,4 +1,4 @@
-use waxdemon_scheduler::{effective_schedule, should_skip_sync, DEFAULT_CRON_SCHEDULE};
+use waxdemon_scheduler::{DEFAULT_CRON_SCHEDULE, effective_schedule, should_skip_sync};
 
 #[test]
 fn default_when_env_missing_or_blank() {

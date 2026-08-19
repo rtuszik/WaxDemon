@@ -2,7 +2,7 @@ pub mod dashboard;
 
 use crate::state::AppState;
 use axum::response::{Html, IntoResponse};
-use axum::{extract::State, routing::get, Router};
+use axum::{Router, extract::State, routing::get};
 
 pub fn router(state: AppState) -> Router {
     Router::new()

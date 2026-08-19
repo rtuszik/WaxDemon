@@ -1,12 +1,12 @@
 use crate::{error::AppError, state::AppState};
 use axum::{
-    extract::{Query, State},
     Json,
+    extract::{Query, State},
 };
 use chrono::Utc;
 use serde::Deserialize;
 use waxdemon_core::{
-    build_dashboard_stats, time_range_filter, DashboardStats, DbItem, HistoryRow, TimeRange,
+    DashboardStats, DbItem, HistoryRow, TimeRange, build_dashboard_stats, time_range_filter,
 };
 
 #[derive(Debug, Deserialize, Default)]

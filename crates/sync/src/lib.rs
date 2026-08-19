@@ -1,3 +1,3 @@
 pub mod run;
 
-pub use run::{run_collection_sync, SyncOutcome};
+pub use run::{SyncOutcome, run_collection_sync};

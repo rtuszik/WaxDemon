@@ -1,4 +1,4 @@
-use waxdemon_core::{build_dashboard_stats, DbItem, HistoryRow};
+use waxdemon_core::{DbItem, HistoryRow, build_dashboard_stats};
 
 #[allow(clippy::too_many_arguments)]
 fn item(
@@ -52,7 +52,6 @@ fn total_items_from_latest_stats_snapshot_when_present() {
     assert_eq!(stats.latest_value_min, Some(1.0));
     assert_eq!(stats.latest_value_mean, Some(8.0));
     assert_eq!(stats.latest_value_max, Some(100.0));
-    // average = mean / total_items
     assert!((stats.average_value_per_item.unwrap() - 8.0 / 42.0).abs() < 1e-9);
 }
 
@@ -90,7 +89,6 @@ fn total_items_falls_back_to_item_count_when_no_stats() {
 
 #[test]
 fn top_and_least_valuable_sorted_and_capped_to_ten() {
-    // 12 items with escalating values; only top 10 and bottom 10 (of 12) should come back.
     let items: Vec<DbItem> = (1..=12)
         .map(|n| {
             item(
@@ -184,7 +182,6 @@ fn genre_distribution_counts_and_sorts_desc() {
     ];
     let stats = build_dashboard_stats(&items, None, &[]);
     let entries: Vec<(String, i64)> = stats.genre_distribution.iter().cloned().collect();
-    // Rock=2 must appear first, then Pop=1 and Electronic=1
     assert_eq!(entries[0], ("Rock".into(), 2));
     assert_eq!(entries.len(), 3);
     let tail: std::collections::HashSet<(String, i64)> = entries[1..].iter().cloned().collect();

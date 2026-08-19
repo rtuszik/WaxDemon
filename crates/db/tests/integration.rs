@@ -1,6 +1,3 @@
-//! DB integration tests. Gated on the `TEST_DATABASE_URL` env var;
-//! skipped (with a notice) when no real Postgres is available.
-
 use waxdemon_db::{
     get_setting, init_pool,
     items::{self, UpsertItem},
@@ -11,7 +8,6 @@ use waxdemon_db::{
 async fn pool() -> Option<waxdemon_db::Db> {
     let url = std::env::var("TEST_DATABASE_URL").ok()?;
     let p = init_pool(&url).await.expect("init pool");
-    // Clean state — strictly ephemeral; tests assume a DB reserved for testing.
     sqlx::query("DROP TABLE IF EXISTS collection_items, collection_stats_history, settings, _sqlx_migrations")
         .execute(&p)
         .await
@@ -31,13 +27,11 @@ async fn settings_round_trip() {
         get_setting(&p, "foo").await.unwrap().as_deref(),
         Some("bar")
     );
-    // Upsert replaces the value.
     set_setting(&p, "foo", "baz").await.unwrap();
     assert_eq!(
         get_setting(&p, "foo").await.unwrap().as_deref(),
         Some("baz")
     );
-    // Missing key returns None.
     assert_eq!(get_setting(&p, "nope").await.unwrap(), None);
 }
 
@@ -62,8 +56,6 @@ async fn recovers_running_sync_and_diagnostic_together() {
         Some("sync interrupted by application restart; retrying is safe")
     );
 
-    // The compare-and-set protects a second startup from claiming the same
-    // recovery after the first transaction has committed.
     assert!(!recover_interrupted_sync(&p).await.unwrap());
 }
 

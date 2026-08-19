@@ -6,6 +6,6 @@ pub mod stats_history;
 
 pub use error::DbError;
 pub use items::{CollectionItemRow, UpsertItem};
-pub use pool::{init_pool, run_migrations, Db};
+pub use pool::{Db, init_pool, run_migrations};
 pub use settings::{get_setting, recover_interrupted_sync, set_setting};
-pub use stats_history::{insert_snapshot, latest_snapshot, range_query, StatsSnapshot};
+pub use stats_history::{StatsSnapshot, insert_snapshot, latest_snapshot, range_query};

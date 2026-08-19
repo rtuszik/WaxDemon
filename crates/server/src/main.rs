@@ -3,7 +3,7 @@ use tracing_subscriber::EnvFilter;
 use waxdemon_db::{init_pool, recover_interrupted_sync, run_migrations};
 use waxdemon_discogs::client::Client;
 use waxdemon_scheduler::{effective_schedule, setup_scheduler};
-use waxdemon_server::{config::Config, router, AppState};
+use waxdemon_server::{AppState, config::Config, router};
 use waxdemon_sync::run::SyncConfig;
 
 #[tokio::main]
@@ -24,7 +24,6 @@ async fn main() -> anyhow::Result<()> {
     let token = cfg.discogs_token.clone().unwrap_or_default();
     let client = Client::new(token.clone());
 
-    // Launch scheduler only if we have credentials; otherwise skip to avoid red herrings.
     let _scheduler =
         if let (Some(username), false) = (cfg.discogs_username.clone(), token.is_empty()) {
             let expr = effective_schedule(cfg.sync_cron_schedule.as_deref());

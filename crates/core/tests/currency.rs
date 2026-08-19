@@ -27,15 +27,11 @@ fn dollar_prefix_with_decimals() {
 
 #[test]
 fn dollar_prefix_with_thousands_separator() {
-    // `$1,234.56`: strip `$` and `,` in one pass -> `1234.56`, then keep last dot -> `1234.56`.
     assert_eq!(parse_currency(Some("$1,234.56")), Some(1234.56));
 }
 
 #[test]
 fn euro_thousands_dot_decimal_comma() {
-    // `€1.234,56`: stripping `,` and `€` together yields `1.23456`. The parser cannot
-    // distinguish EU-style decimal commas from US-style thousands commas, so it picks
-    // the US convention. Documented quirk, not a bug — kept for parity with stored data.
     assert_eq!(parse_currency(Some("€1.234,56")), Some(1.23456));
 }
 
@@ -51,13 +47,11 @@ fn pound_with_decimals() {
 
 #[test]
 fn thousands_separator_alone() {
-    // `1,234` -> after strip `[$,€£¥]` -> `1234` -> Some(1234.0)
     assert_eq!(parse_currency(Some("1,234")), Some(1234.0));
 }
 
 #[test]
 fn multiple_dots_keep_last_as_decimal() {
-    // `1.234.567` -> only last `.` survives -> `1234.567`
     assert_eq!(parse_currency(Some("1.234.567")), Some(1234.567));
 }
 

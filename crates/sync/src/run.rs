@@ -1,14 +1,14 @@
 use chrono::Utc;
 use tracing::{error, info, warn};
-use waxdemon_core::{parse_currency, time_range::iso_z, CONDITION_ORDER};
+use waxdemon_core::{CONDITION_ORDER, parse_currency, time_range::iso_z};
 use waxdemon_db::{
+    Db,
     items::{self, UpsertItem},
     set_setting,
     stats_history::{self, StatsSnapshot},
-    Db,
 };
 use waxdemon_discogs::{
-    client::{extract_next_path, Client},
+    client::{Client, extract_next_path},
     fetch_collection_page, fetch_collection_value, fetch_price_suggestions,
     types::DiscogsReleaseBasic,
 };
@@ -25,7 +25,6 @@ pub struct SyncConfig {
     pub token: String,
 }
 
-/// Build the initial collection-page endpoint.
 fn collection_endpoint(username: &str) -> String {
     format!(
         "/users/{}/collection/folders/0/releases?per_page=100",
@@ -33,7 +32,6 @@ fn collection_endpoint(username: &str) -> String {
     )
 }
 
-/// Fetch every release by following pagination links.
 pub async fn fetch_all_releases(
     client: &Client,
     username: &str,
@@ -96,22 +94,17 @@ pub async fn run_collection_sync(
         set_setting(pool, "sync_total_items", &total.to_string()).await?;
         info!(total, "collection fetched; starting per-release sync");
 
-        // Best-effort overall value.
         let overall = fetch_collection_value(client, &cfg.username).await.ok();
 
         let now_iso = iso_z(Utc::now());
         let mut processed = 0usize;
         let mut synced_items = Vec::with_capacity(total);
-        // Heartbeat every N items so the log shows steady progress without
-        // one line per release. Cadence scales with total: ~20 lines max.
         let heartbeat = (total / 20).clamp(1, 50);
 
         for release in &releases {
             processed += 1;
-            // Update progress in a separate connection since we hold tx.
             set_setting(pool, "sync_current_item", &processed.to_string()).await?;
 
-            // Fetch price suggestion (404 → None, other errors logged + skipped).
             let suggestions = match fetch_price_suggestions(client, release.id).await {
                 Ok(v) => v,
                 Err(e) => {
@@ -215,9 +208,6 @@ pub async fn run_collection_sync(
             None => (None, None, None),
         };
 
-        // Do not hold a database transaction while making rate-limited HTTP
-        // requests. A database failover or an upstream stall used to leave an
-        // idle transaction open for minutes and could strand sync_status.
         let mut tx = pool.begin().await?;
         items::delete_all(&mut *tx).await?;
         for item in &synced_items {
