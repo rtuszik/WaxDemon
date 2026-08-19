@@ -4,7 +4,7 @@
 use waxdemon_db::{
     get_setting, init_pool,
     items::{self, UpsertItem},
-    run_migrations, set_setting,
+    recover_interrupted_sync, run_migrations, set_setting,
     stats_history::{self, StatsSnapshot},
 };
 
@@ -39,6 +39,32 @@ async fn settings_round_trip() {
     );
     // Missing key returns None.
     assert_eq!(get_setting(&p, "nope").await.unwrap(), None);
+}
+
+#[tokio::test]
+async fn recovers_running_sync_and_diagnostic_together() {
+    let Some(p) = pool().await else {
+        eprintln!("skipping: TEST_DATABASE_URL not set");
+        return;
+    };
+    set_setting(&p, "sync_status", "running").await.unwrap();
+    set_setting(&p, "sync_last_error", "old error")
+        .await
+        .unwrap();
+
+    assert!(recover_interrupted_sync(&p).await.unwrap());
+    assert_eq!(
+        get_setting(&p, "sync_status").await.unwrap().as_deref(),
+        Some("error")
+    );
+    assert_eq!(
+        get_setting(&p, "sync_last_error").await.unwrap().as_deref(),
+        Some("sync interrupted by application restart; retrying is safe")
+    );
+
+    // The compare-and-set protects a second startup from claiming the same
+    // recovery after the first transaction has committed.
+    assert!(!recover_interrupted_sync(&p).await.unwrap());
 }
 
 fn sample_item(id: i32) -> UpsertItem {

@@ -21,16 +21,27 @@ pub async fn get_setting(pool: &Db, key: &str) -> Result<Option<String>, DbError
 }
 
 pub async fn recover_interrupted_sync(pool: &Db) -> Result<bool, DbError> {
-    if get_setting(pool, "sync_status").await?.as_deref() != Some("running") {
+    let mut tx = pool.begin().await?;
+    let result = sqlx::query(
+        "UPDATE settings SET value = 'error' WHERE key = 'sync_status' AND value = 'running'",
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    if result.rows_affected() == 0 {
+        tx.rollback().await?;
         return Ok(false);
     }
 
-    set_setting(pool, "sync_status", "error").await?;
-    set_setting(
-        pool,
-        "sync_last_error",
-        "sync interrupted by application restart; retrying is safe",
+    sqlx::query(
+        "INSERT INTO settings (key, value) VALUES ($1, $2)
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
     )
+    .bind("sync_last_error")
+    .bind("sync interrupted by application restart; retrying is safe")
+    .execute(&mut *tx)
     .await?;
+
+    tx.commit().await?;
     Ok(true)
 }
