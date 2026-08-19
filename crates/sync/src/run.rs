@@ -99,11 +99,9 @@ pub async fn run_collection_sync(
         // Best-effort overall value.
         let overall = fetch_collection_value(client, &cfg.username).await.ok();
 
-        let mut tx = pool.begin().await?;
-        items::delete_all(&mut *tx).await?;
-
         let now_iso = iso_z(Utc::now());
         let mut processed = 0usize;
+        let mut synced_items = Vec::with_capacity(total);
         // Heartbeat every N items so the log shows steady progress without
         // one line per release. Cadence scales with total: ~20 lines max.
         let heartbeat = (total / 20).clamp(1, 50);
@@ -188,28 +186,24 @@ pub async fn run_collection_sync(
                 Some(bi.cover_image.clone())
             };
 
-            items::upsert(
-                &mut *tx,
-                &UpsertItem {
-                    id: release.instance_id as i32,
-                    release_id: release.id as i32,
-                    artist,
-                    title,
-                    year: if bi.year > 0 { Some(bi.year) } else { None },
-                    format,
-                    genres_json,
-                    styles_json,
-                    cover_image_url: cover,
-                    added_date: release.date_added.clone(),
-                    folder_id: Some(release.folder_id as i32),
-                    rating: Some(release.rating as i32),
-                    notes: None,
-                    condition: None,
-                    suggested_value,
-                    last_value_check: last_check,
-                },
-            )
-            .await?;
+            synced_items.push(UpsertItem {
+                id: release.instance_id as i32,
+                release_id: release.id as i32,
+                artist,
+                title,
+                year: if bi.year > 0 { Some(bi.year) } else { None },
+                format,
+                genres_json,
+                styles_json,
+                cover_image_url: cover,
+                added_date: release.date_added.clone(),
+                folder_id: Some(release.folder_id as i32),
+                rating: Some(release.rating as i32),
+                notes: None,
+                condition: None,
+                suggested_value,
+                last_value_check: last_check,
+            });
         }
 
         let (min_v, mean_v, max_v) = match &overall {
@@ -221,6 +215,14 @@ pub async fn run_collection_sync(
             None => (None, None, None),
         };
 
+        // Do not hold a database transaction while making rate-limited HTTP
+        // requests. A database failover or an upstream stall used to leave an
+        // idle transaction open for minutes and could strand sync_status.
+        let mut tx = pool.begin().await?;
+        items::delete_all(&mut *tx).await?;
+        for item in &synced_items {
+            items::upsert(&mut *tx, item).await?;
+        }
         stats_history::insert_snapshot(
             &mut *tx,
             &StatsSnapshot {

@@ -1,6 +1,6 @@
 use anyhow::Context;
 use tracing_subscriber::EnvFilter;
-use waxdemon_db::{init_pool, run_migrations};
+use waxdemon_db::{init_pool, recover_interrupted_sync, run_migrations};
 use waxdemon_discogs::client::Client;
 use waxdemon_scheduler::{effective_schedule, setup_scheduler};
 use waxdemon_server::{config::Config, router, AppState};
@@ -17,6 +17,9 @@ async fn main() -> anyhow::Result<()> {
     let cfg = Config::from_env().context("loading config")?;
     let pool = init_pool(&cfg.database_url).await.context("init pool")?;
     run_migrations(&pool).await.context("migrate")?;
+    if recover_interrupted_sync(&pool).await? {
+        tracing::warn!("recovered sync status left running by a previous process");
+    }
 
     let token = cfg.discogs_token.clone().unwrap_or_default();
     let client = Client::new(token.clone());
