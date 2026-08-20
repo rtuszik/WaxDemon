@@ -74,7 +74,7 @@ wasm-bindgen = "0.2"
 
 # Testing
 wiremock = "0.6"
-axum-test = "20"
+axum-test = "21"
 insta = { version = "1.48", features = ["json", "yaml"] }
 
 [profile.release]
