@@ -95,15 +95,15 @@ pub fn build_dashboard_stats(
     let mut format_counts: Vec<(String, i64)> = Vec::new();
 
     for item in all_items {
-        if let Some(genres_json) = &item.genres {
-            if let Ok(genres) = serde_json::from_str::<Vec<String>>(genres_json) {
-                for g in genres {
-                    let g = g.trim().to_string();
-                    if g.is_empty() {
-                        continue;
-                    }
-                    bump(&mut genre_counts, &g);
+        if let Some(genres_json) = &item.genres
+            && let Ok(genres) = serde_json::from_str::<Vec<String>>(genres_json)
+        {
+            for g in genres {
+                let g = g.trim().to_string();
+                if g.is_empty() {
+                    continue;
                 }
+                bump(&mut genre_counts, &g);
             }
         }
 

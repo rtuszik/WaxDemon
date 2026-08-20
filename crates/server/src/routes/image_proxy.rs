@@ -75,10 +75,10 @@ pub async fn handler(
         HeaderValue::from_str(&content_type)
             .unwrap_or(HeaderValue::from_static("application/octet-stream")),
     );
-    if let Some(cl) = content_length {
-        if let Ok(v) = HeaderValue::from_str(&cl) {
-            headers.insert(header::CONTENT_LENGTH, v);
-        }
+    if let Some(cl) = content_length
+        && let Ok(v) = HeaderValue::from_str(&cl)
+    {
+        headers.insert(header::CONTENT_LENGTH, v);
     }
     headers.insert(
         header::CACHE_CONTROL,
