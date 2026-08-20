@@ -113,7 +113,7 @@ pub async fn run_collection_sync(
                 }
             };
 
-            if processed == 1 || processed == total || processed % heartbeat == 0 {
+            if processed == 1 || processed == total || processed.is_multiple_of(heartbeat) {
                 let pacer = client.pacer_snapshot().await;
                 let pct = if total > 0 {
                     (processed as f64 / total as f64) * 100.0

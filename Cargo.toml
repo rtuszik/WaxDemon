@@ -18,7 +18,7 @@ repository = "https://github.com/rtuszik/WaxDemon"
 
 [workspace.dependencies]
 # Async runtime
-tokio = { version = "1.40", features = ["full"] }
+tokio = { version = "1.53", features = ["full"] }
 
 # HTTP
 axum = { version = "0.8", features = ["macros"] }
@@ -75,7 +75,7 @@ wasm-bindgen = "0.2"
 # Testing
 wiremock = "0.6"
 axum-test = "20"
-insta = { version = "1.40", features = ["json", "yaml"] }
+insta = { version = "1.48", features = ["json", "yaml"] }
 
 [profile.release]
 opt-level = 3
