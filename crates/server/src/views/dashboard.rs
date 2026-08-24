@@ -15,7 +15,7 @@ pub async fn render(st: &AppState) -> String {
 async fn fetch_stats(st: &AppState) -> Result<DashboardStats, anyhow::Error> {
     let all_items = waxdemon_db::items::select_all(&st.db).await?;
     let latest = waxdemon_db::stats_history::latest_snapshot(&st.db).await?;
-    let start = time_range_filter(TimeRange::ThreeMonths, Utc::now());
+    let start = time_range_filter(TimeRange::All, Utc::now());
     let history = waxdemon_db::stats_history::range_query(&st.db, start.as_deref()).await?;
 
     let db_items: Vec<DbItem> = all_items
@@ -168,6 +168,13 @@ fn Dashboard(stats: DashboardStats) -> impl IntoView {
 
                 <section class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
                     <div class="bg-neutral-900 rounded-xl p-4">
+                        <div class="flex flex-wrap items-center gap-2 mb-3" aria-label="Chart time range">
+                            <span class="text-xs uppercase text-neutral-500 mr-1">"History"</span>
+                            <button class="history-range px-2.5 py-1 rounded text-xs bg-neutral-700 text-neutral-100" data-range="all">"All"</button>
+                            <button class="history-range px-2.5 py-1 rounded text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300" data-range="1y">"1 year"</button>
+                            <button class="history-range px-2.5 py-1 rounded text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300" data-range="6m">"6 months"</button>
+                            <button class="history-range px-2.5 py-1 rounded text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300" data-range="3m">"3 months"</button>
+                        </div>
                         <div id="value-chart"></div>
                     </div>
                     <div class="bg-neutral-900 rounded-xl p-4">

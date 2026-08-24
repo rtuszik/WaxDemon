@@ -23,7 +23,7 @@ pub async fn handler(
         .time_range
         .as_deref()
         .map(TimeRange::parse)
-        .unwrap_or(TimeRange::ThreeMonths);
+        .unwrap_or(TimeRange::All);
 
     let all_items = waxdemon_db::items::select_all(&st.db).await?;
     let latest_stats = waxdemon_db::stats_history::latest_snapshot(&st.db).await?;

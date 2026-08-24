@@ -56,42 +56,73 @@
         if (typeof ApexCharts === "undefined") return;
         if (!document.getElementById("value-chart")) return;
 
-        let stats;
-        try {
-            const r = await fetch("/api/dashboard-stats");
-            if (!r.ok) throw new Error("stats " + r.status);
-            stats = await r.json();
-        } catch (e) {
-            console.error("dashboard-stats fetch failed", e);
-            return;
+        let activeRange = "all";
+        const ranges = document.querySelectorAll(".history-range");
+
+        async function loadCharts() {
+            let stats;
+            try {
+                const r = await fetch("/api/dashboard-stats?timeRange=" + activeRange);
+                if (!r.ok) throw new Error("stats " + r.status);
+                stats = await r.json();
+            } catch (e) {
+                console.error("dashboard-stats fetch failed", e);
+                return;
+            }
+
+            renderValueChart(stats.valueHistory || []);
+            renderCountChart(stats.itemCountHistory || []);
+            renderYearChart(stats.yearDistribution || {});
         }
 
-        renderValueChart(stats.valueHistory || []);
-        renderCountChart(stats.itemCountHistory || []);
-        renderYearChart(stats.yearDistribution || {});
+        ranges.forEach((button) => {
+            button.addEventListener("click", () => {
+                activeRange = button.dataset.range;
+                ranges.forEach((candidate) => {
+                    const selected = candidate === button;
+                    candidate.classList.toggle("bg-neutral-700", selected);
+                    candidate.classList.toggle("text-neutral-100", selected);
+                    candidate.classList.toggle("bg-neutral-800", !selected);
+                    candidate.classList.toggle("text-neutral-300", !selected);
+                });
+                loadCharts();
+            });
+        });
+
+        await loadCharts();
+    }
+
+    function clearChart(el) {
+        el.replaceChildren();
     }
 
     function baseOptions(extra) {
+        const chart = Object.assign(
+            {
+                background: "transparent",
+                foreColor: "#a3a3a3",
+                toolbar: { show: false },
+                zoom: { enabled: false },
+                animations: { enabled: false },
+            },
+            extra.chart || {},
+        );
         return Object.assign(
             {
-                chart: {
-                    background: "transparent",
-                    foreColor: "#a3a3a3",
-                    toolbar: { show: false },
-                    animations: { enabled: false },
-                },
                 theme: { mode: "dark" },
                 grid: { borderColor: "#262626", strokeDashArray: 3 },
                 tooltip: { theme: "dark" },
                 legend: { labels: { colors: "#d4d4d4" } },
             },
             extra,
+            { chart },
         );
     }
 
     function renderValueChart(history) {
         const el = document.getElementById("value-chart");
         if (!el) return;
+        clearChart(el);
         const series = [
             {
                 name: "Min",
@@ -139,6 +170,7 @@
     function renderCountChart(history) {
         const el = document.getElementById("count-chart");
         if (!el) return;
+        clearChart(el);
         if (history.length < 2) {
             el.innerHTML =
                 '<div class="text-neutral-500 text-sm p-8 text-center">Item count history will appear after a second sync snapshot.</div>';
@@ -179,6 +211,7 @@
     function renderYearChart(dist) {
         const el = document.getElementById("year-chart");
         if (!el) return;
+        clearChart(el);
         // OrderedDist serializes as a JSON object. JS re-orders integer-like keys
         // ascending, which would destroy the backend's sort-by-count-desc intent,
         // so we re-sort here before truncating the long tail into "Other".
