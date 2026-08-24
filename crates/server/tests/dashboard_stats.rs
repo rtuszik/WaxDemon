@@ -66,6 +66,14 @@ async fn empty_db_returns_zero_totals_and_empty_arrays() {
         return;
     };
     let server = TestServer::new(router(st));
+    let default_resp = server.get("/api/dashboard-stats").await;
+    default_resp.assert_status_ok();
+    let default_body: serde_json::Value = default_resp.json();
+    assert_eq!(
+        default_body["itemCountHistory"].as_array().unwrap().len(),
+        2
+    );
+
     let resp = server.get("/api/dashboard-stats?timeRange=all").await;
     resp.assert_status_ok();
     let body: serde_json::Value = resp.json();
