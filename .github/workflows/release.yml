@@ -25,11 +25,14 @@ jobs:
                   fetch-depth: 0
                   ref: ${{ github.event.pull_request.head.sha }}
 
-            - name: Check Conventional Commits since the latest release
-              uses: cocogitto/cocogitto-action@390bda87a19bf627e03ad075c67a11e9ddbb7547 # v4
+            - name: Set up mise
+              uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db # v3
               with:
-                  command: check
-                  args: --from-latest-tag --ignore-merge-commits
+                  version: 2026.8.12
+                  install_args: cocogitto
+
+            - name: Check Conventional Commits since the latest release
+              run: cog check --from-latest-tag --ignore-merge-commits
 
     release:
         if: github.event_name == 'push'
@@ -46,11 +49,14 @@ jobs:
               with:
                   fetch-depth: 0
 
-            - name: Check Conventional Commits since the latest release
-              uses: cocogitto/cocogitto-action@390bda87a19bf627e03ad075c67a11e9ddbb7547 # v4
+            - name: Set up mise
+              uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db # v3
               with:
-                  command: check
-                  args: --from-latest-tag --ignore-merge-commits
+                  version: 2026.8.12
+                  install_args: cocogitto
+
+            - name: Check Conventional Commits since the latest release
+              run: cog check --from-latest-tag --ignore-merge-commits
 
             - name: Determine whether a release is needed
               id: plan
@@ -59,8 +65,8 @@ jobs:
                   target_version="$(cog bump --auto --dry-run | sed -nE 's/^v?([0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?)$/\1/p' | tail -n 1)"
 
                   if [[ -z "$target_version" ]]; then
-                      echo "Cocogitto did not produce a SemVer version" >&2
-                      exit 1
+                      echo "released=false" >> "$GITHUB_OUTPUT"
+                      exit 0
                   fi
 
                   if [[ "$target_version" == "$current_version" ]]; then
@@ -73,12 +79,10 @@ jobs:
 
             - name: Create version commit and tag
               if: steps.plan.outputs.released == 'true'
-              uses: cocogitto/cocogitto-action@390bda87a19bf627e03ad075c67a11e9ddbb7547 # v4
-              with:
-                  command: bump
-                  args: --auto --skip-ci
-                  git-user: github-actions[bot]
-                  git-user-email: 41898282+github-actions[bot]@users.noreply.github.com
+              run: |
+                  git config user.name github-actions[bot]
+                  git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+                  cog bump --auto --skip-ci
 
             - name: Push version commit and tag
               if: steps.plan.outputs.released == 'true'
