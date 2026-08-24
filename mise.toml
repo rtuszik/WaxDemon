@@ -1,6 +1,7 @@
 #:schema https://mise.jdx.dev/schema/mise.json
 
 [tools]
+"cargo:cargo-edit" = "0.13.13"
 cocogitto = "7.0.0"
 oxfmt = "0.64.0"
 rust = "1.97.1"

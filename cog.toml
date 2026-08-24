@@ -1,2 +1,7 @@
 tag_prefix = "v"
-pre_bump_hooks = ["scripts/bump-version {{version}}"]
+pre_bump_hooks = [
+    "cargo build --release",
+    "cargo set-version --workspace {{version}}",
+    "cargo check --release",
+    "scripts/bump-version {{version}}",
+]

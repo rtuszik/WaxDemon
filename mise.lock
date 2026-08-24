@@ -2,6 +2,11 @@
 
 lockfile_version = 1
 
+[[tools."cargo:cargo-edit"]]
+version = "0.13.13"
+backend = "cargo:cargo-edit"
+specifiers = ["0.13.13"]
+
 [[tools.cocogitto]]
 version = "7.0.0"
 backend = "aqua:cocogitto/cocogitto"
