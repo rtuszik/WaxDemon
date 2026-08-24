@@ -69,10 +69,7 @@ async fn empty_db_returns_zero_totals_and_empty_arrays() {
     let default_resp = server.get("/api/dashboard-stats").await;
     default_resp.assert_status_ok();
     let default_body: serde_json::Value = default_resp.json();
-    assert_eq!(
-        default_body["itemCountHistory"].as_array().unwrap().len(),
-        2
-    );
+    assert_eq!(default_body["itemCountHistory"], serde_json::json!([]));
 
     let resp = server.get("/api/dashboard-stats?timeRange=all").await;
     resp.assert_status_ok();
