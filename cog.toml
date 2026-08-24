@@ -1,0 +1,2 @@
+tag_prefix = "v"
+pre_bump_hooks = ["scripts/bump-version {{version}}"]
