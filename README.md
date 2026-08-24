@@ -15,7 +15,7 @@ release. Install it directly — no `helm repo add` required (Helm 3.8+):
 
 ```bash
 helm install waxdemon oci://ghcr.io/rtuszik/waxdemon/waxdemon \
-  --version 0.1.0 \
+  --version 0.2.0 \
   --set secrets.databaseUrl='postgres://user:pass@host:5432/waxdemon' \
   --set secrets.discogsToken='your_discogs_token' \
   --set config.DISCOGS_USERNAME='your_handle'
@@ -27,7 +27,7 @@ In production prefer a pre-existing Secret managed by your secrets stack:
 
 ```bash
 helm install waxdemon oci://ghcr.io/rtuszik/waxdemon/waxdemon \
-  --version 0.1.0 \
+  --version 0.2.0 \
   --set secrets.existingSecret=waxdemon-secrets \
   --set config.DISCOGS_USERNAME='your_handle'
 ```
@@ -94,3 +94,18 @@ DB and end-to-end tests run against a Postgres pointed at by `TEST_DATABASE_URL`
 TEST_DATABASE_URL=postgres://ddtest:ddtest@localhost:5432/waxdemon_test \
   cargo test --workspace -- --test-threads=1
 ```
+
+## Releasing
+
+Releases are created automatically by Cocogitto when Conventional Commits are
+merged to `main`:
+
+- `fix:` produces a patch release.
+- `feat:` produces a minor release.
+- A `BREAKING CHANGE:` footer or `!` after the commit type produces a major release.
+
+Cocogitto treats the existing `v0.2.0` tag as the baseline, so no historical
+commits need rewriting. The workflow creates the GitHub Release and Cocogitto
+creates its `vX.Y.Z` tag, updating the Cargo workspace, Helm chart, and install
+examples in the release commit. It then builds the multi-architecture image and
+pushes the Helm OCI chart to GHCR.

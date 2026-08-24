@@ -2,9 +2,12 @@
 name: Publish Docker Image and Helm Chart to GHCR
 
 on:
-    release:
-        types: [published]
-    workflow_dispatch:
+    workflow_call:
+        inputs:
+            version:
+                description: Release version without the v prefix.
+                required: true
+                type: string
 
 env:
     REGISTRY_IMAGE: ghcr.io/rtuszik/waxdemon
@@ -35,6 +38,7 @@ jobs:
             - name: Checkout repository
               uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
               with:
+                  ref: v${{ inputs.version }}
                   persist-credentials: false
 
             - name: Set up Docker Buildx
@@ -113,8 +117,8 @@ jobs:
                   images: ${{ env.REGISTRY_IMAGE }}
                   tags: |
                       type=sha
-                      type=semver,pattern={{version}}
-                      type=semver,pattern={{major}}.{{minor}}
+                      type=semver,pattern={{version}},value=v${{ inputs.version }}
+                      type=semver,pattern={{major}}.{{minor}},value=v${{ inputs.version }}
                       type=raw,value=latest,enable={{is_default_branch}}
 
             - name: Create manifest list and push
@@ -133,7 +137,6 @@ jobs:
         runs-on: ubuntu-latest
         needs:
             - merge
-        if: github.event_name == 'release'
         permissions:
             contents: read
             packages: write
@@ -142,25 +145,13 @@ jobs:
             - name: Checkout repository
               uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
               with:
+                  ref: v${{ inputs.version }}
                   persist-credentials: false
 
             - name: Install Helm
               uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5
               with:
                   version: v3.16.4
-
-            - name: Derive chart version from release tag
-              id: version
-              run: |
-                  TAG="${GITHUB_EVENT_RELEASE_TAG_NAME}"
-                  VERSION="${TAG#v}"
-                  if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
-                      echo "Release tag '$TAG' does not parse to semver (expected vX.Y.Z or X.Y.Z)" >&2
-                      exit 1
-                  fi
-                  echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-              env:
-                  GITHUB_EVENT_RELEASE_TAG_NAME: ${{ github.event.release.tag_name }}
 
             - name: Log in to GHCR (Helm)
               run: |
@@ -172,14 +163,10 @@ jobs:
             - name: Package chart
               run: |
                   helm package "${CHART_PATH}" \
-                      --version "${STEPS_VERSION_OUTPUTS_VERSION}" \
-                      --app-version "${STEPS_VERSION_OUTPUTS_VERSION}" \
+                      --version "${{ inputs.version }}" \
+                      --app-version "${{ inputs.version }}" \
                       --destination .
-              env:
-                  STEPS_VERSION_OUTPUTS_VERSION: ${{ steps.version.outputs.version }}
 
             - name: Push chart to GHCR as OCI artifact
               run: |
-                  helm push "waxdemon-${STEPS_VERSION_OUTPUTS_VERSION}.tgz" "${CHART_REGISTRY}"
-              env:
-                  STEPS_VERSION_OUTPUTS_VERSION: ${{ steps.version.outputs.version }}
+                  helm push "waxdemon-${{ inputs.version }}.tgz" "${CHART_REGISTRY}"
