@@ -103,9 +103,3 @@ merged to `main`:
 - `fix:` produces a patch release.
 - `feat:` produces a minor release.
 - A `BREAKING CHANGE:` footer or `!` after the commit type produces a major release.
-
-Cocogitto treats the existing `v0.2.0` tag as the baseline, so no historical
-commits need rewriting. The workflow creates the GitHub Release and Cocogitto
-creates its `vX.Y.Z` tag, updating the Cargo workspace, Helm chart, and install
-examples in the release commit. It then builds the multi-architecture image and
-pushes the Helm OCI chart to GHCR.
