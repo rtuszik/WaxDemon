@@ -22,12 +22,9 @@ impl FormatBucket {
 }
 
 pub fn classify_format(format: Option<&str>) -> FormatBucket {
-    let Some(raw) = format else {
+    let Some(raw) = format.filter(|s| !s.is_empty()) else {
         return FormatBucket::Unknown;
     };
-    if raw.is_empty() {
-        return FormatBucket::Unknown;
-    }
     let lower = raw.to_lowercase();
 
     if lower.contains("vinyl")
