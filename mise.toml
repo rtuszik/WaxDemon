@@ -5,7 +5,7 @@
 cocogitto = "7.0.0"
 opengrep = "latest"
 oxfmt = "0.64.0"
-rust = "1.97.1"
+rust = "1.98.0"
 zizmor = "latest"
 
 [tasks.fmt]
