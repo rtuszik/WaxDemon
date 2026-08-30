@@ -11,6 +11,13 @@ services:
             - postgres-data:/var/lib/postgresql/data
         env_file: .env
         restart: unless-stopped
+        read_only: true
+        security_opt:
+            - no-new-privileges:true
+        tmpfs:
+            - /tmp
+            - /run
+            - /var/run/postgresql
         healthcheck:
             test: ["CMD-SHELL", "pg_isready -U waxdemon"]
             interval: 10s
@@ -28,6 +35,11 @@ services:
             postgres:
                 condition: service_healthy
         restart: unless-stopped
+        read_only: true
+        security_opt:
+            - no-new-privileges:true
+        tmpfs:
+            - /tmp
 
 volumes:
     postgres-data:

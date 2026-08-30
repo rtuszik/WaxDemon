@@ -161,12 +161,16 @@ jobs:
                           --password-stdin
 
             - name: Package chart
+              env:
+                  CHART_VERSION: ${{ inputs.version }}
               run: |
                   helm package "${CHART_PATH}" \
-                      --version "${{ inputs.version }}" \
-                      --app-version "${{ inputs.version }}" \
+                      --version "${CHART_VERSION}" \
+                      --app-version "${CHART_VERSION}" \
                       --destination .
 
             - name: Push chart to GHCR as OCI artifact
+              env:
+                  CHART_VERSION: ${{ inputs.version }}
               run: |
-                  helm push "waxdemon-${{ inputs.version }}.tgz" "${CHART_REGISTRY}"
+                  helm push "waxdemon-${CHART_VERSION}.tgz" "${CHART_REGISTRY}"

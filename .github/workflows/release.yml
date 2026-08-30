@@ -24,6 +24,7 @@ jobs:
               with:
                   fetch-depth: 0
                   ref: ${{ github.event.pull_request.head.sha }}
+                  persist-credentials: false
 
             - name: Set up mise
               uses: jdx/mise-action@3c2e0cf82a5b2e5249f0d3635a4d83d0ae861518 # v4
@@ -45,7 +46,8 @@ jobs:
             version: ${{ steps.plan.outputs.version }}
 
         steps:
-            - name: Checkout repository
+            # credentials are required to push the version commit and tag
+            - name: Checkout repository # zizmor: ignore[artipacked]
               uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
               with:
                   fetch-depth: 0
@@ -88,13 +90,16 @@ jobs:
 
             - name: Push version commit and tag
               if: steps.plan.outputs.released == 'true'
-              run: git push origin HEAD "refs/tags/v${{ steps.plan.outputs.version }}"
+              env:
+                  RELEASE_VERSION: ${{ steps.plan.outputs.version }}
+              run: git push origin HEAD "refs/tags/v${RELEASE_VERSION}"
 
             - name: Create GitHub Release
               if: steps.plan.outputs.released == 'true'
-              run: gh release create "v${{ steps.plan.outputs.version }}" --generate-notes
+              run: gh release create "v${RELEASE_VERSION}" --generate-notes
               env:
                   GH_TOKEN: ${{ github.token }}
+                  RELEASE_VERSION: ${{ steps.plan.outputs.version }}
 
     publish:
         needs: release
@@ -105,4 +110,3 @@ jobs:
         uses: ./.github/workflows/publish.yml
         with:
             version: ${{ needs.release.outputs.version }}
-        secrets: inherit
