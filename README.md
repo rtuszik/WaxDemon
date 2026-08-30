@@ -15,7 +15,7 @@ release. Install it directly — no `helm repo add` required (Helm 3.8+):
 
 ```bash
 helm install waxdemon oci://ghcr.io/rtuszik/waxdemon/waxdemon \
-  --version 0.3.0 \
+  --version 0.3.1 \
   --set secrets.databaseUrl='postgres://user:pass@host:5432/waxdemon' \
   --set secrets.discogsToken='your_discogs_token' \
   --set config.DISCOGS_USERNAME='your_handle'
@@ -27,7 +27,7 @@ In production prefer a pre-existing Secret managed by your secrets stack:
 
 ```bash
 helm install waxdemon oci://ghcr.io/rtuszik/waxdemon/waxdemon \
-  --version 0.3.0 \
+  --version 0.3.1 \
   --set secrets.existingSecret=waxdemon-secrets \
   --set config.DISCOGS_USERNAME='your_handle'
 ```

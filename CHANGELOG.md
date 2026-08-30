@@ -2,6 +2,24 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.3.1 - 2026-08-30
+#### Bug Fixes
+- (**changelog**) restore cocogitto separators and exclude from oxfmt - (4fe14e3) - Robin Tuszik
+- (**docker**) correct PostgreSQL data volume mount path - (fa7f388) - Robin Tuszik
+#### Documentation
+- remove outdated release workflow documentation - (8cc8939) - Robin Tuszik
+#### Build system
+- automate Cargo version updates during releases - (e52949b) - Robin Tuszik
+#### Continuous Integration
+- add pre-commit hooks for code quality checks - (7fcaaa4) - Robin Tuszik
+#### Refactoring
+- (**core**) simplify empty format handling - (2864127) - Robin Tuszik
+#### Miscellaneous Chores
+- harden containers and release workflows - (68f3c27) - Robin Tuszik
+- add opengrep and zizmor tooling with oxfmt task - (c7c6c41) - Robin Tuszik
+
+- - -
+
 ## v0.3.0 - 2026-08-24
 #### Features
 - (**dashboard**) add selectable chart history ranges - (e861f56) - Robin Tuszik
