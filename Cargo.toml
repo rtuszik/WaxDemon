@@ -57,7 +57,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 
 # Misc
-rand = "0.9"
+rand = "0.10"
 futures-util = "0.3"
 async-trait = "0.1"
 
