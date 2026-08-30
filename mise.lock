@@ -42,6 +42,41 @@ checksum = "sha256:074f68f05d270da5c0d69d3e234ec362bec4c6e3189c21d1c948d03860365
 url = "https://github.com/cocogitto/cocogitto/releases/download/7.0.0/cocogitto-7.0.0-x86_64-pc-windows-msvc.tar.gz"
 url_api = "https://api.github.com/repos/cocogitto/cocogitto/releases/assets/366659399"
 
+[[tools.opengrep]]
+version = "1.27.1"
+backend = "aqua:opengrep/opengrep"
+specifiers = ["latest"]
+
+[tools.opengrep."platforms.linux-arm64"]
+checksum = "sha256:96ee2caddd5f17821ae6952774a91c8781778bfa9af1ace83645444c0edc6c97"
+url = "https://github.com/opengrep/opengrep/releases/download/v1.27.1/opengrep_manylinux_aarch64"
+url_api = "https://api.github.com/repos/opengrep/opengrep/releases/assets/514844149"
+
+[tools.opengrep."platforms.linux-x64"]
+checksum = "sha256:58053da76672bbeb5b0a5441021c58338707052e10f81d777140ca879bd491ce"
+url = "https://github.com/opengrep/opengrep/releases/download/v1.27.1/opengrep_manylinux_x86"
+url_api = "https://api.github.com/repos/opengrep/opengrep/releases/assets/514844159"
+
+[tools.opengrep."platforms.linux-x64-musl"]
+checksum = "sha256:58053da76672bbeb5b0a5441021c58338707052e10f81d777140ca879bd491ce"
+url = "https://github.com/opengrep/opengrep/releases/download/v1.27.1/opengrep_manylinux_x86"
+url_api = "https://api.github.com/repos/opengrep/opengrep/releases/assets/514844159"
+
+[tools.opengrep."platforms.macos-arm64"]
+checksum = "sha256:e0cf2287c00f9e559b5ad28f5731924fc5ec7778f35363d2e15f94e15880a6de"
+url = "https://github.com/opengrep/opengrep/releases/download/v1.27.1/opengrep_osx_arm64"
+url_api = "https://api.github.com/repos/opengrep/opengrep/releases/assets/514844169"
+
+[tools.opengrep."platforms.macos-x64"]
+checksum = "sha256:0e96abde66eda9dcfe8b81b2c616d71deadae0ec62fe026b9e199498ce1aac10"
+url = "https://github.com/opengrep/opengrep/releases/download/v1.27.1/opengrep_osx_x86"
+url_api = "https://api.github.com/repos/opengrep/opengrep/releases/assets/514844167"
+
+[tools.opengrep."platforms.windows-x64"]
+checksum = "sha256:99516b397daed8527228d4471b035c2241c500c5cdb98db618e6ee8ec997d731"
+url = "https://github.com/opengrep/opengrep/releases/download/v1.27.1/opengrep_windows_x86.exe"
+url_api = "https://api.github.com/repos/opengrep/opengrep/releases/assets/514844170"
+
 [[tools.oxfmt]]
 version = "0.64.0"
 backend = "npm:oxfmt"
@@ -51,3 +86,41 @@ specifiers = ["0.64.0"]
 version = "1.97.1"
 backend = "core:rust"
 specifiers = ["1.97.1"]
+
+[[tools.zizmor]]
+version = "1.29.0"
+backend = "aqua:zizmorcore/zizmor"
+specifiers = ["latest"]
+
+[tools.zizmor."platforms.linux-arm64"]
+checksum = "sha256:415eaa7c0a06479a701b8e44a3e812c1047decc848ec4bede7bd6bbf49f22d20"
+url = "https://github.com/zizmorcore/zizmor/releases/download/v1.29.0/zizmor-aarch64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/498263143"
+provenance = "github-attestations"
+
+[tools.zizmor."platforms.linux-x64"]
+checksum = "sha256:dd96df044a6e8538d5f423790f453bdd03d49e5b2bcc38214acc41a2f1297839"
+url = "https://github.com/zizmorcore/zizmor/releases/download/v1.29.0/zizmor-x86_64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/498263145"
+provenance = "github-attestations"
+
+[tools.zizmor."platforms.linux-x64-musl"]
+provenance = "github-attestations"
+
+[tools.zizmor."platforms.macos-arm64"]
+checksum = "sha256:720322fade9e83a9c7953944c438f2ba942636b86b96a8f0e6b15ce94c8a6b6f"
+url = "https://github.com/zizmorcore/zizmor/releases/download/v1.29.0/zizmor-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/498263141"
+provenance = "github-attestations"
+
+[tools.zizmor."platforms.macos-x64"]
+checksum = "sha256:648b72ab9941a7f2a8d65d7b68a8e76cef789538c8df3a3950384d38423375b0"
+url = "https://github.com/zizmorcore/zizmor/releases/download/v1.29.0/zizmor-x86_64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/498263144"
+provenance = "github-attestations"
+
+[tools.zizmor."platforms.windows-x64"]
+checksum = "sha256:68a6bc6888f10bf0d53658c75885e7c1b7a0588d4c1fbc3f0ca280ad7324bf06"
+url = "https://github.com/zizmorcore/zizmor/releases/download/v1.29.0/zizmor-x86_64-pc-windows-msvc.zip"
+url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/498263142"
+provenance = "github-attestations"

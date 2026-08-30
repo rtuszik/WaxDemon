@@ -3,8 +3,10 @@
 [tools]
 "cargo:cargo-edit" = "0.13.13"
 cocogitto = "7.0.0"
+opengrep = "latest"
 oxfmt = "0.64.0"
 rust = "1.97.1"
+zizmor = "latest"
 
 [tasks.fmt]
 description = "Apply rustfmt, oxfmt across the workspace"
@@ -13,6 +15,9 @@ run = ["cargo fmt --all", "oxfmt"]
 [tasks.fmt-check]
 description = "Fail if rustfmt or oxfmt would change anything (CI parity)"
 run = ["cargo fmt --all -- --check", "oxfmt --check"]
+
+[tasks."format:oxfmt"]
+run = "oxfmt -c .oxfmtrc.json ."
 
 [tasks.clippy]
 description = "Clippy with -D warnings across all targets"
