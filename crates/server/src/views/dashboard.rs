@@ -168,7 +168,7 @@ fn Dashboard(stats: DashboardStats) -> impl IntoView {
 
                 <section class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
                     <div class="bg-neutral-900 rounded-xl p-4">
-                        <div class="flex flex-wrap items-center gap-2 mb-3" aria-label="Chart time range">
+                        <div class="flex flex-wrap items-center gap-3 ml-2 mb-3" aria-label="Chart time range">
                             <span class="text-xs uppercase text-neutral-500 mr-1">"History"</span>
                             <button class="history-range px-2.5 py-1 rounded text-xs bg-neutral-700 text-neutral-100" data-range="all">"All"</button>
                             <button class="history-range px-2.5 py-1 rounded text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300" data-range="1y">"1 year"</button>
