@@ -1,5 +1,6 @@
 pub mod error;
 pub mod items;
+pub mod legacy_import;
 pub mod pool;
 pub mod settings;
 pub mod stats_history;
