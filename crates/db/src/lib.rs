@@ -1,3 +1,4 @@
+pub mod connections;
 pub mod error;
 pub mod items;
 pub mod legacy_import;

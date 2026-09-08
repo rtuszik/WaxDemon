@@ -1,4 +1,5 @@
 pub mod config;
+pub mod credential_vault;
 pub mod error;
 pub mod legacy_migration;
 pub mod routes;

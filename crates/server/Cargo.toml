@@ -44,6 +44,8 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 url = { workspace = true }
 urlencoding = "2"
+chacha20poly1305 = { version = "0.11.0", features = ["zeroize"] }
+secrecy = { version = "0.10.3", features = ["serde"] }
 
 [dev-dependencies]
 axum-test = { workspace = true }

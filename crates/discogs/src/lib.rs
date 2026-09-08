@@ -1,5 +1,6 @@
 pub mod client;
 pub mod error;
+pub mod oauth;
 pub mod types;
 
 pub use client::{Client, fetch_collection_page, fetch_collection_value, fetch_price_suggestions};
