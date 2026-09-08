@@ -17,6 +17,8 @@ url = { workspace = true }
 tracing = { workspace = true }
 thiserror = { workspace = true }
 rand = { workspace = true }
+oauth1-request = { version = "0.6.1", default-features = false, features = ["std"] }
+secrecy = "0.10.3"
 
 [dev-dependencies]
 wiremock = { workspace = true }
