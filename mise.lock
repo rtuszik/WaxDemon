@@ -43,39 +43,39 @@ url = "https://github.com/cocogitto/cocogitto/releases/download/7.0.0/cocogitto-
 url_api = "https://api.github.com/repos/cocogitto/cocogitto/releases/assets/366659399"
 
 [[tools.opengrep]]
-version = "1.27.1"
+version = "1.30.0"
 backend = "aqua:opengrep/opengrep"
 specifiers = ["latest"]
 
 [tools.opengrep."platforms.linux-arm64"]
-checksum = "sha256:96ee2caddd5f17821ae6952774a91c8781778bfa9af1ace83645444c0edc6c97"
-url = "https://github.com/opengrep/opengrep/releases/download/v1.27.1/opengrep_manylinux_aarch64"
-url_api = "https://api.github.com/repos/opengrep/opengrep/releases/assets/514844149"
+checksum = "sha256:a5d5a4a58ba5d46ff51e921663da1c2bba38f4b03987f4aeec87f16c6ad3ecae"
+url = "https://github.com/opengrep/opengrep/releases/download/v1.30.0/opengrep_manylinux_aarch64"
+url_api = "https://api.github.com/repos/opengrep/opengrep/releases/assets/548657431"
 
 [tools.opengrep."platforms.linux-x64"]
-checksum = "sha256:58053da76672bbeb5b0a5441021c58338707052e10f81d777140ca879bd491ce"
-url = "https://github.com/opengrep/opengrep/releases/download/v1.27.1/opengrep_manylinux_x86"
-url_api = "https://api.github.com/repos/opengrep/opengrep/releases/assets/514844159"
+checksum = "sha256:35779bdd72e92129c8df2a77f0c55e8c08356801ea92591ef32108d6b28d564c"
+url = "https://github.com/opengrep/opengrep/releases/download/v1.30.0/opengrep_manylinux_x86"
+url_api = "https://api.github.com/repos/opengrep/opengrep/releases/assets/548657435"
 
 [tools.opengrep."platforms.linux-x64-musl"]
-checksum = "sha256:58053da76672bbeb5b0a5441021c58338707052e10f81d777140ca879bd491ce"
-url = "https://github.com/opengrep/opengrep/releases/download/v1.27.1/opengrep_manylinux_x86"
-url_api = "https://api.github.com/repos/opengrep/opengrep/releases/assets/514844159"
+checksum = "sha256:35779bdd72e92129c8df2a77f0c55e8c08356801ea92591ef32108d6b28d564c"
+url = "https://github.com/opengrep/opengrep/releases/download/v1.30.0/opengrep_manylinux_x86"
+url_api = "https://api.github.com/repos/opengrep/opengrep/releases/assets/548657435"
 
 [tools.opengrep."platforms.macos-arm64"]
-checksum = "sha256:e0cf2287c00f9e559b5ad28f5731924fc5ec7778f35363d2e15f94e15880a6de"
-url = "https://github.com/opengrep/opengrep/releases/download/v1.27.1/opengrep_osx_arm64"
-url_api = "https://api.github.com/repos/opengrep/opengrep/releases/assets/514844169"
+checksum = "sha256:0f5bc3dec09d995c61331a4017b856ede508f90d95b018d95f1dc6166be89fdd"
+url = "https://github.com/opengrep/opengrep/releases/download/v1.30.0/opengrep_osx_arm64"
+url_api = "https://api.github.com/repos/opengrep/opengrep/releases/assets/548657446"
 
 [tools.opengrep."platforms.macos-x64"]
-checksum = "sha256:0e96abde66eda9dcfe8b81b2c616d71deadae0ec62fe026b9e199498ce1aac10"
-url = "https://github.com/opengrep/opengrep/releases/download/v1.27.1/opengrep_osx_x86"
-url_api = "https://api.github.com/repos/opengrep/opengrep/releases/assets/514844167"
+checksum = "sha256:650772a849a2986880982b7dea0371f96a75d354de95f94e8c1a2e6f8f6262d1"
+url = "https://github.com/opengrep/opengrep/releases/download/v1.30.0/opengrep_osx_x86"
+url_api = "https://api.github.com/repos/opengrep/opengrep/releases/assets/548657443"
 
 [tools.opengrep."platforms.windows-x64"]
-checksum = "sha256:99516b397daed8527228d4471b035c2241c500c5cdb98db618e6ee8ec997d731"
-url = "https://github.com/opengrep/opengrep/releases/download/v1.27.1/opengrep_windows_x86.exe"
-url_api = "https://api.github.com/repos/opengrep/opengrep/releases/assets/514844170"
+checksum = "sha256:b5cf4f8fe9f44e030aab2d579d96bd395c139db1f1ba66633676ff4d5ebc7c39"
+url = "https://github.com/opengrep/opengrep/releases/download/v1.30.0/opengrep_windows_x86.exe"
+url_api = "https://api.github.com/repos/opengrep/opengrep/releases/assets/548657445"
 
 [[tools.oxfmt]]
 version = "0.64.0"
@@ -88,74 +88,74 @@ backend = "core:rust"
 specifiers = ["1.97.1"]
 
 [[tools.rust-analyzer]]
-version = "2026-05-04"
+version = "2026-09-07"
 backend = "aqua:rust-lang/rust-analyzer"
 specifiers = ["latest"]
 
 [tools.rust-analyzer."platforms.linux-arm64"]
-checksum = "sha256:eee311e65f5eefae9c7834c2e782c90557fee0883d3b9cc4f8fbcea5188240ec"
-url = "https://github.com/rust-lang/rust-analyzer/releases/download/2026-05-04/rust-analyzer-aarch64-unknown-linux-gnu.gz"
-url_api = "https://api.github.com/repos/rust-lang/rust-analyzer/releases/assets/411569721"
+checksum = "sha256:484de96ea9e5daf9e6361b6fa91be9521a7e6c652111af54a7ead80f900b1e55"
+url = "https://github.com/rust-lang/rust-analyzer/releases/download/2026-09-07/rust-analyzer-aarch64-unknown-linux-gnu.gz"
+url_api = "https://api.github.com/repos/rust-lang/rust-analyzer/releases/assets/548242946"
 
 [tools.rust-analyzer."platforms.linux-x64"]
-checksum = "sha256:c292b81c42637cb4ec92d9e54e1c7da0a40a85ef5121dd602344d44ccd60f779"
-url = "https://github.com/rust-lang/rust-analyzer/releases/download/2026-05-04/rust-analyzer-x86_64-unknown-linux-gnu.gz"
-url_api = "https://api.github.com/repos/rust-lang/rust-analyzer/releases/assets/411569851"
+checksum = "sha256:a3500183aa08bf740c0da6e030ad262d4cfa1c19e7ce195ab5f772bdf9ddfb12"
+url = "https://github.com/rust-lang/rust-analyzer/releases/download/2026-09-07/rust-analyzer-x86_64-unknown-linux-gnu.gz"
+url_api = "https://api.github.com/repos/rust-lang/rust-analyzer/releases/assets/548243469"
 
 [tools.rust-analyzer."platforms.linux-x64-musl"]
-checksum = "sha256:9ca9e478cb79e231e9f0f62e9e495abd36acd917eff805e9fd8c502caf6973a1"
-url = "https://github.com/rust-lang/rust-analyzer/releases/download/2026-05-04/rust-analyzer-x86_64-unknown-linux-musl.gz"
-url_api = "https://api.github.com/repos/rust-lang/rust-analyzer/releases/assets/411569857"
+checksum = "sha256:d05af6fdc2eab4e2b348f53029b6557369c910ba6cb2006d85cc1fb6ea400c35"
+url = "https://github.com/rust-lang/rust-analyzer/releases/download/2026-09-07/rust-analyzer-x86_64-unknown-linux-musl.gz"
+url_api = "https://api.github.com/repos/rust-lang/rust-analyzer/releases/assets/548243502"
 
 [tools.rust-analyzer."platforms.macos-arm64"]
-checksum = "sha256:7b3689e7fc10c245313e06e6384fd4d0d8f15e19824f55554875c2b51ef3b9cf"
-url = "https://github.com/rust-lang/rust-analyzer/releases/download/2026-05-04/rust-analyzer-aarch64-apple-darwin.gz"
-url_api = "https://api.github.com/repos/rust-lang/rust-analyzer/releases/assets/411569711"
+checksum = "sha256:16e9b2af9db7c0ce015ffe88f85db27669b05c84887a59c737d697d2c5f8d349"
+url = "https://github.com/rust-lang/rust-analyzer/releases/download/2026-09-07/rust-analyzer-aarch64-apple-darwin.gz"
+url_api = "https://api.github.com/repos/rust-lang/rust-analyzer/releases/assets/548242897"
 
 [tools.rust-analyzer."platforms.macos-x64"]
-checksum = "sha256:a5e83889039974c9b10b97794e2dbb11613a60bb4610859925e232b2855bc86f"
-url = "https://github.com/rust-lang/rust-analyzer/releases/download/2026-05-04/rust-analyzer-x86_64-apple-darwin.gz"
-url_api = "https://api.github.com/repos/rust-lang/rust-analyzer/releases/assets/411569825"
+checksum = "sha256:41161c05bd7e2396a5cea86a691d37919ec0af331a06bbdc0f323979034f9dad"
+url = "https://github.com/rust-lang/rust-analyzer/releases/download/2026-09-07/rust-analyzer-x86_64-apple-darwin.gz"
+url_api = "https://api.github.com/repos/rust-lang/rust-analyzer/releases/assets/548243400"
 
 [tools.rust-analyzer."platforms.windows-x64"]
-checksum = "sha256:a9703da68a13ca5a4fab7dbcd4d3cc868fad52725fa819b1b9f8d92a7196bc84"
-url = "https://github.com/rust-lang/rust-analyzer/releases/download/2026-05-04/rust-analyzer-x86_64-pc-windows-msvc.zip"
-url_api = "https://api.github.com/repos/rust-lang/rust-analyzer/releases/assets/411569842"
+checksum = "sha256:cd3dddd580edac199c5e84c6cceb3addea32769c25cb6b597024a200b3359b05"
+url = "https://github.com/rust-lang/rust-analyzer/releases/download/2026-09-07/rust-analyzer-x86_64-pc-windows-msvc.zip"
+url_api = "https://api.github.com/repos/rust-lang/rust-analyzer/releases/assets/548243437"
 
 [[tools.zizmor]]
-version = "1.29.0"
+version = "1.30.0"
 backend = "aqua:zizmorcore/zizmor"
 specifiers = ["latest"]
 
 [tools.zizmor."platforms.linux-arm64"]
-checksum = "sha256:415eaa7c0a06479a701b8e44a3e812c1047decc848ec4bede7bd6bbf49f22d20"
-url = "https://github.com/zizmorcore/zizmor/releases/download/v1.29.0/zizmor-aarch64-unknown-linux-gnu.tar.gz"
-url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/498263143"
+checksum = "sha256:018a024d6b6d09733b07f6ef42838d984c23ec04bc9b2acd55f7d67826aeafe5"
+url = "https://github.com/zizmorcore/zizmor/releases/download/v1.30.0/zizmor-aarch64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/537081734"
 provenance = "github-attestations"
 
 [tools.zizmor."platforms.linux-x64"]
-checksum = "sha256:dd96df044a6e8538d5f423790f453bdd03d49e5b2bcc38214acc41a2f1297839"
-url = "https://github.com/zizmorcore/zizmor/releases/download/v1.29.0/zizmor-x86_64-unknown-linux-gnu.tar.gz"
-url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/498263145"
+checksum = "sha256:ec8c95cd800845abb9bbc5f377ec7c57d2eb8e2386a00a201d3a74ee4092e5ed"
+url = "https://github.com/zizmorcore/zizmor/releases/download/v1.30.0/zizmor-x86_64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/537081732"
 provenance = "github-attestations"
 
 [tools.zizmor."platforms.linux-x64-musl"]
 provenance = "github-attestations"
 
 [tools.zizmor."platforms.macos-arm64"]
-checksum = "sha256:720322fade9e83a9c7953944c438f2ba942636b86b96a8f0e6b15ce94c8a6b6f"
-url = "https://github.com/zizmorcore/zizmor/releases/download/v1.29.0/zizmor-aarch64-apple-darwin.tar.gz"
-url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/498263141"
+checksum = "sha256:c9c5d83730efb86f2cd71b487605c00a4d63903e4f9458485ed5eac3b1924ab1"
+url = "https://github.com/zizmorcore/zizmor/releases/download/v1.30.0/zizmor-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/537081737"
 provenance = "github-attestations"
 
 [tools.zizmor."platforms.macos-x64"]
-checksum = "sha256:648b72ab9941a7f2a8d65d7b68a8e76cef789538c8df3a3950384d38423375b0"
-url = "https://github.com/zizmorcore/zizmor/releases/download/v1.29.0/zizmor-x86_64-apple-darwin.tar.gz"
-url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/498263144"
+checksum = "sha256:343c85c8f709edf14bf3c8781d53574975ecbb2d23c80ed1eab4932ab0a72343"
+url = "https://github.com/zizmorcore/zizmor/releases/download/v1.30.0/zizmor-x86_64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/537081736"
 provenance = "github-attestations"
 
 [tools.zizmor."platforms.windows-x64"]
-checksum = "sha256:68a6bc6888f10bf0d53658c75885e7c1b7a0588d4c1fbc3f0ca280ad7324bf06"
-url = "https://github.com/zizmorcore/zizmor/releases/download/v1.29.0/zizmor-x86_64-pc-windows-msvc.zip"
-url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/498263142"
+checksum = "sha256:a2fcf298b84d3d8498a3d718bb63f0abe26823bf68a11f0f439620f8f2f878f0"
+url = "https://github.com/zizmorcore/zizmor/releases/download/v1.30.0/zizmor-x86_64-pc-windows-msvc.zip"
+url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/537081735"
 provenance = "github-attestations"
