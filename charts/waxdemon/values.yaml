@@ -88,12 +88,9 @@ resources: {}
 #   cpu: 100m
 #   memory: 128Mi
 
-# Probes hit /api/collection/sync/status — the same endpoint the
-# Dockerfile HEALTHCHECK uses. It returns 200 as long as the app is up
-# and the database pool is reachable.
 livenessProbe:
     httpGet:
-        path: /api/collection/sync/status
+        path: /health/live
         port: http
     initialDelaySeconds: 15
     periodSeconds: 30
@@ -101,7 +98,7 @@ livenessProbe:
     failureThreshold: 3
 readinessProbe:
     httpGet:
-        path: /api/collection/sync/status
+        path: /health/ready
         port: http
     initialDelaySeconds: 5
     periodSeconds: 10
@@ -129,29 +126,29 @@ nodeSelector: {}
 tolerations: []
 affinity: {}
 
-# Non-sensitive environment variables. Rendered into a ConfigMap and
-# mounted via envFrom. Leave DISCOGS_USERNAME empty to disable sync.
 config:
-    DISCOGS_USERNAME: ""
-    SYNC_CRON_SCHEDULE: "0 0 0 * * *"
+    PUBLIC_URL: ""
+    OAUTH_ACTIVE_KEY_ID: primary
+    OAUTH_KEYRING_FILE: /var/run/secrets/waxdemon/keyring.json
     RUST_LOG: "info"
     BIND_ADDR: "0.0.0.0:3000"
 
-# Sensitive values. One of `existingSecret` or `databaseUrl` MUST be set
-# — template rendering fails otherwise. discogsToken is optional; sync
-# is skipped when empty.
 secrets:
     # Use a pre-existing Secret (e.g., managed by External Secrets / SOPS).
     # When set, the chart does not create a Secret. Keys in the Secret
-    # must match secrets.keys.* (defaults: DATABASE_URL, DISCOGS_TOKEN).
+    # must match secrets.keys.*.
     existingSecret: ""
     keys:
         databaseUrl: DATABASE_URL
-        discogsToken: DISCOGS_TOKEN
+        consumerKey: DISCOGS_CONSUMER_KEY
+        consumerSecret: DISCOGS_CONSUMER_SECRET
+        oauthKeyring: keyring.json
     # Inline values, used only when existingSecret is empty. Prefer
     # existingSecret in production.
     databaseUrl: ""
-    discogsToken: ""
+    consumerKey: ""
+    consumerSecret: ""
+    oauthKeyring: ""
 
 # Raw passthrough to the Deployment's `env` list.
 extraEnv: []

@@ -50,14 +50,16 @@ spec:
                 secretKeyRef:
                   name: {{ include "waxdemon.secretName" . }}
                   key: {{ .Values.secrets.keys.databaseUrl }}
-            {{- if or .Values.secrets.discogsToken .Values.secrets.existingSecret }}
-            - name: DISCOGS_TOKEN
+            - name: DISCOGS_CONSUMER_KEY
               valueFrom:
                 secretKeyRef:
                   name: {{ include "waxdemon.secretName" . }}
-                  key: {{ .Values.secrets.keys.discogsToken }}
-                  optional: true
-            {{- end }}
+                  key: {{ .Values.secrets.keys.consumerKey }}
+            - name: DISCOGS_CONSUMER_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "waxdemon.secretName" . }}
+                  key: {{ .Values.secrets.keys.consumerSecret }}
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -79,12 +81,22 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- with .Values.volumeMounts }}
           volumeMounts:
+            - name: oauth-keyring
+              mountPath: /var/run/secrets/waxdemon
+              readOnly: true
+          {{- with .Values.volumeMounts }}
             {{- toYaml . | nindent 12 }}
           {{- end }}
-      {{- with .Values.volumes }}
       volumes:
+        - name: oauth-keyring
+          secret:
+            secretName: {{ include "waxdemon.secretName" . }}
+            defaultMode: 0440
+            items:
+              - key: {{ .Values.secrets.keys.oauthKeyring }}
+                path: keyring.json
+      {{- with .Values.volumes }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
       {{- with .Values.nodeSelector }}

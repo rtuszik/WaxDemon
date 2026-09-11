@@ -11,5 +11,5 @@ spec:
     - name: wget
       image: busybox
       command: ['wget']
-      args: ['-q', '-O-', '{{ include "waxdemon.fullname" . }}:{{ .Values.service.port }}/api/collection/sync/status']
+      args: ['-q', '-O-', '{{ include "waxdemon.fullname" . }}:{{ .Values.service.port }}/health/ready']
   restartPolicy: Never
