@@ -11,14 +11,14 @@ path = "src/lib.rs"
 [dependencies]
 anyhow = { workspace = true }
 chrono = { workspace = true }
-waxdemon-core = { path = "../core" }
 waxdemon-db = { path = "../db" }
 waxdemon-discogs = { path = "../discogs" }
-serde = { workspace = true }
 serde_json = { workspace = true }
-thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
+rust_decimal = "1.43.0"
+sqlx.workspace = true
+url.workspace = true
 
 [dev-dependencies]
 sqlx = { workspace = true }

@@ -1,6 +1,9 @@
 use crate::error::DiscogsError;
+use crate::oauth::{OAuthCredentials, OAuthError};
 use crate::types::{CollectionPage, CollectionValue, PriceSuggestionsResponse};
+use oauth1_request::{Builder, Credentials, PLAINTEXT};
 use rand::Rng;
+use secrecy::{ExposeSecret, SecretString};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
@@ -41,7 +44,8 @@ pub fn required_sleep(st: &PacerState, fallback_interval: Duration, now: Instant
 pub struct Client {
     http: reqwest::Client,
     base_url: String,
-    token: String,
+    token: SecretString,
+    oauth: Option<(OAuthCredentials, OAuthCredentials)>,
     pub max_retries: u32,
     pub initial_delay_ms: u64,
     pub disable_sleep: bool,
@@ -59,10 +63,12 @@ impl Client {
             http: reqwest::Client::builder()
                 .user_agent(USER_AGENT)
                 .timeout(REQUEST_TIMEOUT)
+                .redirect(reqwest::redirect::Policy::none())
                 .build()
                 .expect("reqwest client"),
             base_url,
-            token: token.into(),
+            token: SecretString::from(token.into()),
+            oauth: None,
             max_retries: 3,
             initial_delay_ms: 1500,
             disable_sleep: false,
@@ -71,23 +77,61 @@ impl Client {
         }
     }
 
+    pub fn with_oauth(
+        consumer: OAuthCredentials,
+        access: OAuthCredentials,
+        base: &str,
+    ) -> Result<Self, OAuthError> {
+        let base = crate::oauth::validate_url(base)?;
+        if base.path() != "/" || base.query().is_some() {
+            return Err(OAuthError::InvalidConfiguration);
+        }
+        let mut client = Self::with_base(String::new(), base.as_str().trim_end_matches('/').into());
+        client.oauth = Some((consumer, access));
+        Ok(client)
+    }
+
+    fn authorization(&self, url: &str) -> Result<reqwest::header::HeaderValue, DiscogsError> {
+        let value = match &self.oauth {
+            Some((consumer, access)) => Builder::new(
+                Credentials::new(
+                    consumer.token().expose_secret(),
+                    consumer.secret().expose_secret(),
+                ),
+                PLAINTEXT,
+            )
+            .token(Credentials::new(
+                access.token().expose_secret(),
+                access.secret().expose_secret(),
+            ))
+            .get(url.split('?').next().unwrap_or(url), &()),
+            None => format!("Discogs token={}", self.token.expose_secret()),
+        };
+        let mut header = reqwest::header::HeaderValue::from_str(&value)
+            .map_err(|_| DiscogsError::Retry("invalid authorization header".into()))?;
+        header.set_sensitive(true);
+        Ok(header)
+    }
+
     pub async fn request_json<T: for<'de> serde::Deserialize<'de>>(
         &self,
         endpoint: &str,
     ) -> Result<T, DiscogsError> {
+        if !endpoint.starts_with('/')
+            || endpoint.starts_with("//")
+            || endpoint.contains(['\\', '#'])
+        {
+            return Err(DiscogsError::Retry("invalid API endpoint".into()));
+        }
         let url = format!("{}{}", self.base_url, endpoint);
         let mut last_error: Option<DiscogsError> = None;
 
-        self.wait_for_slot().await;
-
         for attempt in 0..=self.max_retries {
+            self.wait_for_slot().await;
             let resp = self
                 .http
                 .get(&url)
-                .header(
-                    reqwest::header::AUTHORIZATION,
-                    format!("Discogs token={}", self.token),
-                )
+                .header(reqwest::header::AUTHORIZATION, self.authorization(&url)?)
                 .header(reqwest::header::CONTENT_TYPE, "application/json")
                 .send()
                 .await;

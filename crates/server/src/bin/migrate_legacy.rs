@@ -36,7 +36,7 @@ async fn main() -> anyhow::Result<()> {
         println!("Imported rows rolled back; additive schema migrations remain applied.");
     } else {
         println!(
-            "Legacy tables retained. This command does not switch the application to multi-user mode."
+            "Legacy tables retained. Start the multi-user server and sign in as this owner through Discogs OAuth."
         );
     }
     pool.close().await;
