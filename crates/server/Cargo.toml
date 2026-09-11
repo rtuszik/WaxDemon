@@ -17,22 +17,19 @@ path = "src/main.rs"
 name = "waxdemon-migrate-legacy"
 path = "src/bin/migrate_legacy.rs"
 
+[[bin]]
+name = "waxdemon-oauth-smoke"
+path = "src/bin/oauth_smoke.rs"
+
 [dependencies]
 anyhow = { workspace = true }
 axum = { workspace = true }
-bytes = { workspace = true }
 chrono = { workspace = true }
 waxdemon-core = { path = "../core" }
 waxdemon-db = { path = "../db" }
 waxdemon-discogs = { path = "../discogs" }
-waxdemon-scheduler = { path = "../scheduler" }
 waxdemon-sync = { path = "../sync" }
-futures-util = { workspace = true }
-http = { workspace = true }
-hyper = { workspace = true }
 leptos = { workspace = true, features = ["ssr"] }
-leptos_meta = { workspace = true, features = ["ssr"] }
-mime = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -43,14 +40,24 @@ tower-http = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 url = { workspace = true }
-urlencoding = "2"
 chacha20poly1305 = { version = "0.11.0", features = ["zeroize"] }
 secrecy = { version = "0.10.3", features = ["serde"] }
+rpassword = { version = "7.5.4" }
+axum-login = "0.18.0"
+sha2 = "0.11.0"
+time = "0.3.55"
+tower-sessions = { version = "0.14.0", default-features = false, features = ["axum-core"] }
+sqlx.workspace = true
+async-trait.workspace = true
+subtle = "2.6.1"
+hex = "0.4.3"
+apalis = { version = "0.7.4", features = ["limit", "retry", "catch-panic"] }
+apalis-sql = { version = "0.7.4", features = ["postgres", "tokio-comp"] }
+leptos_axum.workspace = true
+waxdemon-app = { version = "0.3.1", path = "../app", features = ["ssr"] }
+any_spawner = { version = "0.3.0", features = ["tokio"] }
 
 [dev-dependencies]
-axum-test = { workspace = true }
-insta = { workspace = true }
 sqlx = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-urlencoding = "2"
 wiremock = { workspace = true }

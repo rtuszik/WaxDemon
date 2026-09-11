@@ -1,10 +1,7 @@
+#![recursion_limit = "256"]
+
+pub mod auth;
 pub mod config;
 pub mod credential_vault;
-pub mod error;
+pub mod jobs;
 pub mod legacy_migration;
-pub mod routes;
-pub mod state;
-pub mod views;
-
-pub use routes::router;
-pub use state::AppState;

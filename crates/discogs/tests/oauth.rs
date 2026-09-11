@@ -227,3 +227,21 @@ fn credentials_are_validated_and_redacted() {
     assert!(!debug.contains("private-token"));
     assert!(!debug.contains("private-secret"));
 }
+
+#[tokio::test]
+async fn out_of_band_flow_sends_oob_without_weakening_callback_validation() {
+    let server = MockServer::start().await;
+    Mock::given(path("/oauth/request_token"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(
+            "oauth_token=request-token&oauth_token_secret=request-secret&oauth_callback_confirmed=true",
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let client = client(&server.uri());
+    assert!(client.request_token("oob").await.is_err());
+    let token = client.request_token_out_of_band().await.unwrap();
+    assert_eq!(token.credentials().token().expose_secret(), "request-token");
+    let requests = server.received_requests().await.unwrap();
+    assert!(auth(&requests[0]).contains("oauth_callback=\"oob\""));
+}

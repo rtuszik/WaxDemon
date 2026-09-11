@@ -98,3 +98,17 @@ fn rejects_missing_keys_invalid_identifiers_and_invalid_owners() {
     assert!(vault.encrypt(0, &credentials()).is_err());
     assert!(vault.encrypt(-1, &credentials()).is_err());
 }
+
+#[test]
+fn temporary_credentials_are_bound_to_the_attempt_and_cannot_replace_connections() {
+    let vault = vault("primary", &[("primary", 1)]);
+    let attempt = vault
+        .encrypt_attempt("browser-one", &credentials())
+        .unwrap();
+    let decrypted = vault.decrypt_attempt("browser-one", &attempt).unwrap();
+    assert_eq!(decrypted.token().expose_secret(), "user-access-token");
+    assert!(vault.decrypt_attempt("browser-two", &attempt).is_err());
+    assert!(vault.decrypt(42, &attempt).is_err());
+    let connection = vault.encrypt(42, &credentials()).unwrap();
+    assert!(vault.decrypt_attempt("42", &connection).is_err());
+}
