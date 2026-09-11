@@ -52,6 +52,25 @@ impl CredentialVault {
         if user_id <= 0 {
             return Err(CredentialError::Encryption);
         }
+        self.seal(
+            &format!("waxdemon:discogs-connection:v1:{user_id}"),
+            credentials,
+        )
+    }
+
+    pub fn encrypt_attempt(
+        &self,
+        binding: &str,
+        credentials: &OAuthCredentials,
+    ) -> Result<EncryptedConnection, CredentialError> {
+        self.seal(&format!("waxdemon:oauth-attempt:v1:{binding}"), credentials)
+    }
+
+    fn seal(
+        &self,
+        context: &str,
+        credentials: &OAuthCredentials,
+    ) -> Result<EncryptedConnection, CredentialError> {
         let key = self
             .keys
             .get(&self.active_key_id)
@@ -65,7 +84,7 @@ impl CredentialVault {
         ])
         .map_err(|_| CredentialError::Encryption)?
         .into();
-        let aad = associated_data(user_id, &self.active_key_id);
+        let aad = format!("{context}:{}", self.active_key_id);
         let ciphertext = cipher
             .encrypt(
                 &nonce,
@@ -90,6 +109,25 @@ impl CredentialVault {
         if user_id <= 0 {
             return Err(CredentialError::Decryption);
         }
+        self.open(
+            &format!("waxdemon:discogs-connection:v1:{user_id}"),
+            connection,
+        )
+    }
+
+    pub fn decrypt_attempt(
+        &self,
+        binding: &str,
+        connection: &EncryptedConnection,
+    ) -> Result<OAuthCredentials, CredentialError> {
+        self.open(&format!("waxdemon:oauth-attempt:v1:{binding}"), connection)
+    }
+
+    fn open(
+        &self,
+        context: &str,
+        connection: &EncryptedConnection,
+    ) -> Result<OAuthCredentials, CredentialError> {
         let key = self
             .keys
             .get(&connection.key_id)
@@ -98,7 +136,7 @@ impl CredentialVault {
             .map_err(|_| CredentialError::Decryption)?;
         let nonce = XNonce::try_from(connection.nonce.as_slice())
             .map_err(|_| CredentialError::Decryption)?;
-        let aad = associated_data(user_id, &connection.key_id);
+        let aad = format!("{context}:{}", connection.key_id);
         let plaintext: SecretSlice<u8> = cipher
             .decrypt(
                 &nonce,
@@ -113,8 +151,4 @@ impl CredentialVault {
             .map_err(|_| CredentialError::Decryption)?;
         OAuthCredentials::new(token, secret).map_err(|_| CredentialError::Decryption)
     }
-}
-
-fn associated_data(user_id: i64, key_id: &str) -> String {
-    format!("waxdemon:discogs-connection:v1:{user_id}:{key_id}")
 }

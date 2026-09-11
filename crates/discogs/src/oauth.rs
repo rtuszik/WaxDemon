@@ -52,6 +52,10 @@ impl OAuthCredentials {
 pub struct RequestToken(OAuthCredentials);
 
 impl RequestToken {
+    pub fn from_credentials(credentials: OAuthCredentials) -> Self {
+        Self(credentials)
+    }
+
     pub fn credentials(&self) -> &OAuthCredentials {
         &self.0
     }
@@ -78,6 +82,9 @@ pub struct OAuthClient {
 }
 
 impl OAuthClient {
+    pub fn collection_client(&self, access: OAuthCredentials) -> Result<crate::Client, OAuthError> {
+        crate::Client::with_oauth(self.consumer.clone(), access, self.base.as_str())
+    }
     pub fn new(consumer: OAuthCredentials) -> Result<Self, OAuthError> {
         Self::with_base(consumer, DISCOGS_API_BASE_URL)
     }
@@ -102,6 +109,17 @@ impl OAuthClient {
 
     pub async fn request_token(&self, callback: &str) -> Result<RequestToken, OAuthError> {
         validate_url(callback)?;
+        self.request_token_with_callback(callback).await
+    }
+
+    pub async fn request_token_out_of_band(&self) -> Result<RequestToken, OAuthError> {
+        self.request_token_with_callback("oob").await
+    }
+
+    async fn request_token_with_callback(
+        &self,
+        callback: &str,
+    ) -> Result<RequestToken, OAuthError> {
         let url = self.base.join("/oauth/request_token").unwrap();
         let header = Builder::<_, _, &str>::new(self.consumer.signing_credentials(), PLAINTEXT)
             .callback(callback)
@@ -183,7 +201,7 @@ impl OAuthClient {
     }
 }
 
-fn validate_url(value: &str) -> Result<Url, OAuthError> {
+pub(crate) fn validate_url(value: &str) -> Result<Url, OAuthError> {
     let url = Url::parse(value).map_err(|_| OAuthError::InvalidConfiguration)?;
     let local = match url.host() {
         Some(url::Host::Ipv4(ip)) => ip.is_loopback(),
