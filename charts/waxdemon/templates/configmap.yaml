@@ -1,3 +1,4 @@
+{{- $_ := required "config.PUBLIC_URL must be set to the public application origin" .Values.config.PUBLIC_URL -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:

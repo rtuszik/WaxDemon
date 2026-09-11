@@ -3,3 +3,9 @@ target
 .github
 **/*.md
 coverage
+.env
+.env.*
+secrets
+*.pem
+.codex
+.agents
