@@ -5,8 +5,8 @@ members = [
     "crates/db",
     "crates/discogs",
     "crates/sync",
-    "crates/scheduler",
     "crates/server",
+    "crates/app",
 ]
 
 [workspace.package]
@@ -25,10 +25,6 @@ axum = { version = "0.8", features = ["macros"] }
 tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.6", features = ["trace", "cors", "fs"] }
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls", "stream"] }
-hyper = "1"
-http = "1"
-bytes = "1"
-mime = "0.3"
 url = "2.5"
 
 # Serde
@@ -58,12 +54,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 
 # Misc
 rand = "0.9"
-futures-util = "0.3"
 async-trait = "0.1"
-
-# Scheduler
-tokio-cron-scheduler = "0.15"
-chrono-tz = "0.10"
 
 # Leptos
 leptos = { version = "0.8" }
@@ -74,8 +65,6 @@ wasm-bindgen = "0.2"
 
 # Testing
 wiremock = "0.6"
-axum-test = "20"
-insta = { version = "1.48", features = ["json", "yaml"] }
 
 [profile.release]
 opt-level = 3
@@ -85,3 +74,19 @@ strip = true
 
 [profile.dev]
 opt-level = 0
+
+[[workspace.metadata.leptos]]
+name = "waxdemon"
+bin-package = "waxdemon-server"
+bin-target = "waxdemon"
+bin-exe-name = "waxdemon"
+lib-package = "waxdemon-app"
+output-name = "waxdemon"
+site-root = "target/site"
+site-pkg-dir = "pkg"
+assets-dir = "public"
+style-file = "crates/app/style.css"
+lib-features = ["hydrate"]
+lib-default-features = false
+bin-default-features = true
+disable-erase-components = true
