@@ -19,6 +19,7 @@ thiserror = { workspace = true }
 rand = { workspace = true }
 oauth1-request = { version = "0.6.1", default-features = false, features = ["std"] }
 secrecy = "0.10.3"
+rust_decimal = { version = "1.43.0", features = ["serde-with-arbitrary-precision"] }
 
 [dev-dependencies]
 wiremock = { workspace = true }

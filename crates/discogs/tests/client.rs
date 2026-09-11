@@ -11,6 +11,59 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 
 const TOKEN: &str = "test-token-123";
 
+#[tokio::test]
+async fn oauth_data_requests_use_the_owner_and_do_not_follow_redirects() {
+    use waxdemon_discogs::oauth::{OAuthClient, OAuthCredentials};
+    let server = MockServer::start().await;
+    let other = MockServer::start().await;
+    Mock::given(path("/collection"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"ok": true})))
+        .mount(&server)
+        .await;
+    Mock::given(path("/redirect"))
+        .respond_with(
+            ResponseTemplate::new(302).insert_header("location", format!("{}/stolen", other.uri())),
+        )
+        .mount(&server)
+        .await;
+    let oauth = OAuthClient::with_base(
+        OAuthCredentials::new("consumer".into(), "consumer-secret".into()).unwrap(),
+        &server.uri(),
+    )
+    .unwrap();
+    for owner in ["alice", "bob"] {
+        let mut client = oauth
+            .collection_client(OAuthCredentials::new(owner.into(), "owner-secret".into()).unwrap())
+            .unwrap();
+        client.disable_sleep = true;
+        client
+            .request_json::<serde_json::Value>("/collection?page=1&per_page=100")
+            .await
+            .unwrap();
+        assert!(
+            client
+                .request_json::<serde_json::Value>("/redirect")
+                .await
+                .is_err()
+        );
+        assert!(
+            client
+                .request_json::<serde_json::Value>("//evil.example/steal")
+                .await
+                .is_err()
+        );
+        assert!(!format!("{client:?}").contains("owner-secret"));
+    }
+    let requests = server.received_requests().await.unwrap();
+    for (request, owner) in requests.iter().zip(["alice", "alice", "bob", "bob"]) {
+        let auth = request.headers["authorization"].to_str().unwrap();
+        assert!(auth.starts_with("OAuth "));
+        assert!(auth.contains(&format!("oauth_token=\"{owner}\"")));
+        assert!(auth.contains("oauth_consumer_key=\"consumer\""));
+    }
+    assert!(other.received_requests().await.unwrap().is_empty());
+}
+
 fn fast_client(base_url: String) -> Client {
     let mut c = Client::with_base(TOKEN, base_url);
     c.initial_delay_ms = 1;
