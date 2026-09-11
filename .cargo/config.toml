@@ -3,3 +3,6 @@ retry = 4
 
 [term]
 color = "always"
+
+[env]
+LEPTOS_OUTPUT_NAME = "waxdemon"

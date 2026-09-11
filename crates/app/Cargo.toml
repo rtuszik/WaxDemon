@@ -1,0 +1,28 @@
+[package]
+name = "waxdemon-app"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []
+hydrate = ["leptos/hydrate"]
+ssr = ["leptos/ssr", "leptos_meta/ssr", "leptos/nonce"]
+
+[dependencies]
+waxdemon-core = { path = "../core" }
+leptos.workspace = true
+leptos_meta.workspace = true
+leptos_router.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+url.workspace = true
+wasm-bindgen.workspace = true
+gloo-net = "0.7.0"
+serde-wasm-bindgen = "0.6.5"
+js-sys = "0.3"
+web-sys = { version = "0.3.95", features = ["ResizeObserver", "Element"] }
