@@ -13,6 +13,24 @@ permissions:
     contents: read
 
 jobs:
+    image-build:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+              with:
+                  persist-credentials: false
+
+            - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd
+
+            - name: Build release image without publishing
+              uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f
+              with:
+                  context: .
+                  push: false
+                  tags: waxdemon:ci
+                  cache-from: type=gha,scope=image-validation
+                  cache-to: type=gha,mode=max,scope=image-validation
+
     build-test:
         runs-on: ubuntu-latest
 
@@ -47,6 +65,7 @@ jobs:
               with:
                   toolchain: 1.97.0
                   components: rustfmt, clippy
+                  targets: wasm32-unknown-unknown
 
             - name: Toolchain info
               run: rustc --version && cargo --version
@@ -68,9 +87,6 @@ jobs:
 
             - name: Build sync
               run: cargo build -p waxdemon-sync --verbose
-
-            - name: Build scheduler
-              run: cargo build -p waxdemon-scheduler --verbose
 
             - name: Build server
               run: cargo build -p waxdemon-server --verbose
@@ -101,8 +117,29 @@ jobs:
             - name: Test sync
               run: cargo test -p waxdemon-sync --verbose -- --test-threads=1
 
-            - name: Test scheduler
-              run: cargo test -p waxdemon-scheduler --verbose -- --test-threads=1
-
             - name: Test server
               run: cargo test -p waxdemon-server --verbose -- --test-threads=1
+
+            - name: Test frontend logic
+              run: cargo test -p waxdemon-app
+
+            - name: Lint WASM
+              run: cargo clippy -p waxdemon-app --target wasm32-unknown-unknown --no-default-features --features hydrate -- -D warnings
+
+            - name: Build SSR and WASM assets
+              run: |
+                  cargo install cargo-leptos --version 0.3.7 --locked
+                  cargo leptos build
+
+            - name: Browser integration
+              run: |
+                  chromedriver --port=9515 --allowed-ips=127.0.0.1 > /tmp/waxdemon-chromedriver.log 2>&1 &
+                  webdriver_pid=$!
+                  trap 'kill "$webdriver_pid"' EXIT
+                  for attempt in $(seq 1 30); do
+                    if curl --fail --silent http://127.0.0.1:9515/status >/dev/null; then break; fi
+                    sleep 1
+                  done
+                  export WEBDRIVER_URL=http://127.0.0.1:9515
+                  export LEPTOS_SITE_ROOT="$PWD/target/site"
+                  cargo test -p waxdemon-server --test authentication browser_hydration -- --ignored --test-threads=1

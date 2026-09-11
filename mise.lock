@@ -7,6 +7,11 @@ version = "0.13.13"
 backend = "cargo:cargo-edit"
 specifiers = ["0.13.13"]
 
+[[tools."cargo:cargo-leptos"]]
+version = "0.3.7"
+backend = "cargo:cargo-leptos"
+specifiers = ["0.3.7"]
+
 [[tools.cocogitto]]
 version = "7.0.0"
 backend = "aqua:cocogitto/cocogitto"
