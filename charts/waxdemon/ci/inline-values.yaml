@@ -1,0 +1,7 @@
+config:
+    PUBLIC_URL: https://wax.example
+secrets:
+    databaseUrl: postgres://localhost/lint
+    consumerKey: lint-consumer
+    consumerSecret: lint-consumer-secret
+    oauthKeyring: '{"primary":"1111111111111111111111111111111111111111111111111111111111111111"}'

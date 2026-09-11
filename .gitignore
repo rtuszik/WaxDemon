@@ -9,6 +9,9 @@ Cargo.lock.bak
 
 # Env files (opt-in for committing)
 .env
+secrets/
 
 # Database files (local dev)
 .db/
+docs/
+IMPLEMENTATION_PLAN.md
