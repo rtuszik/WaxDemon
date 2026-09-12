@@ -21,23 +21,48 @@ pub async fn import_legacy(
     username: &str,
     mode: ImportMode,
 ) -> Result<ImportReport, DbError> {
+    let mut tx = pool.begin().await?;
+    let report = import_legacy_in_transaction(&mut tx, discogs_id, username, false).await?;
+    match mode {
+        ImportMode::Preview => tx.rollback().await?,
+        ImportMode::Commit => tx.commit().await?,
+    }
+    Ok(report)
+}
+
+pub async fn import_legacy_for_oauth(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    discogs_id: i64,
+    username: &str,
+) -> Result<ImportReport, DbError> {
+    import_legacy_in_transaction(tx, discogs_id, username, true).await
+}
+
+async fn import_legacy_in_transaction(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    discogs_id: i64,
+    username: &str,
+    allow_pending_users: bool,
+) -> Result<ImportReport, DbError> {
     if discogs_id <= 0 || username.trim().is_empty() {
         return Err(DbError::Config(
             "a verified Discogs identity is required".into(),
         ));
     }
 
-    let mut tx = pool.begin().await?;
+    let tx = &mut **tx;
     sqlx::query("SET LOCAL lock_timeout = '10s'")
         .execute(&mut *tx)
         .await?;
-    sqlx::raw_sql(
+    sqlx::query(
         "LOCK TABLE legacy_import, users, releases, user_collection_items,
-         user_collection_history, user_settings IN EXCLUSIVE MODE;
-         LOCK TABLE collection_items, collection_stats_history, settings IN SHARE MODE;",
+         user_collection_history, user_settings IN EXCLUSIVE MODE",
     )
     .execute(&mut *tx)
     .await?;
+    sqlx::query("LOCK TABLE collection_items, collection_stats_history, settings IN SHARE MODE")
+        .execute(&mut *tx)
+        .await?;
 
     let imported: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM legacy_import)")
         .fetch_one(&mut *tx)
@@ -48,11 +73,16 @@ pub async fn import_legacy(
         ));
     }
 
-    let occupied: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM users)")
-        .fetch_one(&mut *tx)
-        .await?;
+    let occupied: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM users WHERE NOT $1 OR role <> 'user' OR status <> 'pending')",
+    )
+    .bind(allow_pending_users)
+    .fetch_one(&mut *tx)
+    .await?;
     if occupied {
-        return Err(DbError::Config("import requires an empty multi-user destination; existing accounts will not be promoted or overwritten".into()));
+        return Err(DbError::Config(
+            "legacy import would conflict with existing application users".into(),
+        ));
     }
 
     let invalid_money: bool = sqlx::query_scalar(
@@ -76,7 +106,9 @@ pub async fn import_legacy(
 
     let user_id: i64 = sqlx::query_scalar(
         "INSERT INTO users (discogs_id, username, role, status)
-         VALUES ($1, $2, 'admin', 'approved') RETURNING id",
+         VALUES ($1, $2, 'admin', 'approved')
+         ON CONFLICT (discogs_id) DO UPDATE SET username = EXCLUDED.username, role = 'admin', status = 'approved'
+         RETURNING id",
     )
     .bind(discogs_id)
     .bind(username)
@@ -157,10 +189,6 @@ pub async fn import_legacy(
     .execute(&mut *tx)
     .await?;
 
-    match mode {
-        ImportMode::Preview => tx.rollback().await?,
-        ImportMode::Commit => tx.commit().await?,
-    }
     Ok(ImportReport {
         user_id,
         item_count,

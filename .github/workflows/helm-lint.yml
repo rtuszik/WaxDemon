@@ -39,6 +39,15 @@ jobs:
                   helm template waxdemon charts/waxdemon \
                       -f charts/waxdemon/ci/inline-values.yaml
 
+            - name: helm template (first startup)
+              run: |
+                  rendered=$(helm template waxdemon charts/waxdemon \
+                      -f charts/waxdemon/ci/inline-values.yaml \
+                      --set config.DISCOGS_USERNAME=test-owner)
+                  [[ "$rendered" != *'DISCOGS_TOKEN'* ]]
+                  [[ "$rendered" == *'DISCOGS_USERNAME: "test-owner"'* ]]
+                  [[ "$rendered" == *'type: Recreate'* ]]
+
             - name: helm template (existingSecret + ingress + autoscaling + httpRoute)
               run: |
                   helm template waxdemon charts/waxdemon \

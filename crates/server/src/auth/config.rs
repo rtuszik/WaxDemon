@@ -1,4 +1,4 @@
-use super::{AuthError, AuthState};
+use super::AuthState;
 use crate::credential_vault::CredentialVault;
 use secrecy::{ExposeSecret, SecretBox, SecretString};
 use std::{collections::BTreeMap, sync::Arc};
@@ -38,15 +38,7 @@ pub async fn from_env(pool: sqlx::PgPool) -> anyhow::Result<AuthState> {
         Arc::new(vault),
         &public_url,
     )?;
-    let admin: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM users WHERE role = 'admin' AND status = 'approved')",
-    )
-    .fetch_one(&state.pool)
-    .await
-    .map_err(|_| AuthError::Internal)?;
-    anyhow::ensure!(
-        admin,
-        "a verified, migrated approved admin is required; run the explicit legacy import first"
-    );
-    Ok(state)
+    state
+        .with_legacy_owner(std::env::var("DISCOGS_USERNAME").ok())
+        .await
 }

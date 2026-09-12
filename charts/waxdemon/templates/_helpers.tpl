@@ -62,7 +62,7 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
-Name of the Secret to reference for DATABASE_URL / DISCOGS_TOKEN.
+Name of the Secret containing database and OAuth credentials.
 Returns .Values.secrets.existingSecret when set, otherwise the chart-
 managed secret name (fullname).
 */}}

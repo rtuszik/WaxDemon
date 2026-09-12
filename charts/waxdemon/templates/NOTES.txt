@@ -40,12 +40,8 @@
    Postgres chart). For local development the repo also ships a
    docker-compose.yml that bundles Postgres.
 
-3. Discogs sync:
-   Set config.DISCOGS_USERNAME and secrets.discogsToken (or include
-   DISCOGS_TOKEN in secrets.existingSecret) to enable background
-   syncing on the schedule defined by config.SYNC_CRON_SCHEDULE.
-
-4. Configuration checklist:
-   - secrets.databaseUrl OR secrets.existingSecret must be set
-   - config.DISCOGS_USERNAME + secrets.discogsToken are required for
-     the scheduled sync job to run (the app starts either way)
+3. First login:
+   Set config.DISCOGS_USERNAME to the existing owner's username.
+   Their first Discogs OAuth login imports legacy data and creates
+   the administrator. No personal token or manual import is needed.
+   Additional users require administrator approval.
