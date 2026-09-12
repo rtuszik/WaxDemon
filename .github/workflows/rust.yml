@@ -95,7 +95,7 @@ jobs:
               run: cargo build --workspace --tests --verbose
 
             - name: Clippy
-              run: cargo clippy --workspace --all-targets -- -D warnings
+              run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
             - name: Wait for postgres
               run: |
