@@ -26,6 +26,7 @@ pub struct AuthState {
     pub(crate) pool: PgPool,
     pub(crate) oauth: OAuthClient,
     pub(crate) vault: Arc<CredentialVault>,
+    pub(crate) legacy_owner: Option<String>,
     pub(crate) leptos: leptos::prelude::LeptosOptions,
     pub(super) origin: String,
     pub(super) callback: String,
@@ -59,6 +60,7 @@ impl AuthState {
             pool,
             oauth,
             vault,
+            legacy_owner: None,
             leptos: leptos::prelude::LeptosOptions::builder()
                 .output_name("waxdemon")
                 .site_root(
@@ -72,6 +74,31 @@ impl AuthState {
                 .to_string(),
             secure: url.scheme() == "https",
         })
+    }
+
+    pub async fn with_legacy_owner(mut self, username: Option<String>) -> anyhow::Result<Self> {
+        let (imported, admin, legacy_data): (bool, bool, bool) = sqlx::query_as(
+            "SELECT EXISTS(SELECT 1 FROM legacy_import),
+                    EXISTS(SELECT 1 FROM users WHERE role = 'admin' AND status = 'approved'),
+                    EXISTS(SELECT 1 FROM collection_items UNION ALL
+                           SELECT 1 FROM collection_stats_history UNION ALL SELECT 1 FROM settings)",
+        )
+        .fetch_one(&self.pool)
+        .await?;
+        if imported || admin {
+            anyhow::ensure!(
+                admin,
+                "an approved administrator is required; completed imports will not be repeated"
+            );
+            anyhow::ensure!(
+                imported || !legacy_data,
+                "unimported legacy data exists alongside an administrator; refusing to reassign it"
+            );
+        } else {
+            self.legacy_owner = Some(username.filter(|name| !name.trim().is_empty())
+                .ok_or_else(|| anyhow::anyhow!("DISCOGS_USERNAME is required until the owner completes their first OAuth login"))?);
+        }
+        Ok(self)
     }
 
     pub fn router(self) -> Router {

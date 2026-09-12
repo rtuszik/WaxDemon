@@ -8,8 +8,7 @@ WORKDIR /build
 RUN rustup target add wasm32-unknown-unknown \
     && cargo install cargo-leptos --version 0.3.7 --locked
 COPY . .
-RUN cargo leptos build --release --lib-cargo-args=--locked --bin-cargo-args=--locked \
-    && cargo build --release --locked -p waxdemon-server --bin waxdemon-migrate-legacy
+RUN cargo leptos build --release --lib-cargo-args=--locked --bin-cargo-args=--locked
 
 FROM debian:trixie-slim AS runtime
 
@@ -20,7 +19,6 @@ RUN apt-get update \
 
 WORKDIR /app
 COPY --from=builder /build/target/release/waxdemon /app/waxdemon
-COPY --from=builder /build/target/release/waxdemon-migrate-legacy /app/waxdemon-migrate-legacy
 COPY --from=builder /build/target/site /app/site
 
 ENV RUST_LOG=info
