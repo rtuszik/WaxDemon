@@ -17,7 +17,7 @@ In production prefer a pre-existing Secret managed by your secrets stack:
 
 ```bash
 helm install waxdemon oci://ghcr.io/rtuszik/waxdemon/waxdemon \
-  --version 1.0.0 \
+  --version 0.4.0 \
   --set secrets.existingSecret=waxdemon-secrets \
   --set config.PUBLIC_URL='https://waxdemon.example.com' \
   --set config.DISCOGS_USERNAME='your_handle'
