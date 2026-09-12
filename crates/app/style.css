@@ -412,6 +412,11 @@ small {
 .request-status:not(:empty) {
     margin-bottom: 12px;
 }
+.sync-strip .request-status {
+    display: block;
+    min-height: 1.5em;
+    margin-bottom: 0;
+}
 .error {
     display: flex;
     align-items: center;
