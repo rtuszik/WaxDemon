@@ -1,8 +1,7 @@
 tag_prefix = "v"
 pre_bump_hooks = [
-    "cargo build --release",
     "cargo set-version --workspace {{version}}",
-    "cargo check --release",
+    "cargo metadata --format-version 1 > /dev/null",
     "scripts/bump-version {{version}}",
 ]
 

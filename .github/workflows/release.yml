@@ -40,7 +40,7 @@ jobs:
               uses: jdx/mise-action@3c2e0cf82a5b2e5249f0d3635a4d83d0ae861518 # v4
               with:
                   version: 2026.8.12
-                  install_args: "rust cargo:cargo-edit cocogitto"
+                  install_args: "cocogitto"
                   env: false
 
             - name: Check Conventional Commits since the latest release
@@ -71,6 +71,10 @@ jobs:
                   echo "released=true" >> "$GITHUB_OUTPUT"
                   echo "version=$target_version" >> "$GITHUB_OUTPUT"
 
+            - name: Install version update tools
+              if: steps.plan.outputs.released == 'true'
+              run: mise install --locked rust cargo:cargo-edit
+
             - name: Create version commit and tag
               if: steps.plan.outputs.released == 'true'
               env:
@@ -90,7 +94,7 @@ jobs:
               if: steps.plan.outputs.released == 'true'
               env:
                   RELEASE_VERSION: ${{ steps.plan.outputs.version }}
-              run: git push origin HEAD "refs/tags/v${RELEASE_VERSION}"
+              run: git push --atomic origin HEAD:refs/heads/main "refs/tags/v${RELEASE_VERSION}"
 
             - name: Create GitHub Release
               if: steps.plan.outputs.released == 'true'
