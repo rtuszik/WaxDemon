@@ -83,9 +83,9 @@ url = "https://github.com/opengrep/opengrep/releases/download/v1.30.0/opengrep_w
 url_api = "https://api.github.com/repos/opengrep/opengrep/releases/assets/548657445"
 
 [[tools.oxfmt]]
-version = "0.64.0"
+version = "0.66.0"
 backend = "npm:oxfmt"
-specifiers = ["0.64.0"]
+specifiers = ["0.66.0"]
 
 [[tools.rust]]
 version = "1.97.1"
