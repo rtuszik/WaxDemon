@@ -328,6 +328,7 @@ async fn browser_hydration_library_settings_and_chart_lifecycle() {
     driver
         .wait("document.querySelectorAll('.chart canvas').length===5")
         .await;
+    assert_eq!(driver.script("return performance.getEntriesByType('resource').filter(r => new URL(r.name).pathname === '/api/dashboard').length").await, 0);
     driver.snapshot("overview").await;
     assert_original_styles(&driver).await;
     driver.script("window.scrollTo(0,650)").await;
@@ -1201,6 +1202,77 @@ async fn sync_queue_enforces_approval_csrf_deduplication_daily_schedule_and_work
         .execute(&pool)
         .await
         .unwrap();
+    cleanup(pool, admin, schema).await;
+}
+
+#[tokio::test]
+async fn dashboard_bounds_history_and_keeps_all_rows_accessible() {
+    let (pool, admin, schema) = database().await;
+    let server = MockServer::start().await;
+    provider(&server, 101).await;
+    let mut alice = browser(&pool, &server);
+    alice.login().await;
+    let id = alice.me().await["user"]["id"].as_i64().unwrap();
+    sqlx::query("UPDATE users SET status='approved' WHERE id=$1")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO user_collection_history (user_id,timestamp,total_items,value_median,currency) SELECT $1,to_char('2020-01-01'::timestamp + n*interval '1 minute','YYYY-MM-DD HH24:MI:SS'),n,n,'EUR' FROM generate_series(1,10001) n")
+        .bind(id).execute(&pool).await.unwrap();
+    let (status, _, body) = alice.request("GET", "/api/dashboard", "", None).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert!(
+        body.len() < 300_000,
+        "dashboard payload: {} bytes",
+        body.len()
+    );
+    let data: serde_json::Value = serde_json::from_str(&body).unwrap();
+    let history = data["history"].as_array().unwrap();
+    assert!(history.len() <= 1000);
+    assert_eq!(history.first().unwrap()["total_items"], 1);
+    assert_eq!(history.last().unwrap()["total_items"], 10001);
+    assert_eq!(data["history_total"], 10001);
+    assert_eq!(data["history_rows"].as_array().unwrap().len(), 50);
+    assert_eq!(data["history_rows"][0]["total_items"], 10001);
+    for (page, count, first) in [(2, 50, 9951), (201, 1, 1)] {
+        let (status, _, body) = alice
+            .request(
+                "GET",
+                &format!("/api/dashboard?history_page={page}"),
+                "",
+                None,
+            )
+            .await;
+        assert_eq!(status, StatusCode::OK);
+        let data: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(data["history_rows"].as_array().unwrap().len(), count);
+        assert_eq!(data["history_rows"][0]["total_items"], first);
+    }
+    assert_eq!(
+        alice
+            .request("GET", "/api/dashboard?history_page=0", "", None)
+            .await
+            .0,
+        StatusCode::BAD_REQUEST
+    );
+    let response = alice
+        .app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/dashboard")
+                .header("cookie", alice.cookie.as_ref().unwrap())
+                .header("accept-encoding", "gzip")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response.headers()["content-encoding"], "gzip");
+    let compressed = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    assert!(compressed.len() < body.len() / 2);
     cleanup(pool, admin, schema).await;
 }
 

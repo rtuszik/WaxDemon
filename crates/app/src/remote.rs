@@ -2,6 +2,10 @@ use crate::Bootstrap;
 use leptos::prelude::*;
 use serde_json::Value;
 
+#[cfg(target_arch = "wasm32")]
+#[derive(Clone, Copy)]
+pub struct HydrationRequests(pub StoredValue<std::collections::HashSet<String>>);
+
 #[derive(Clone, Copy)]
 pub struct RefreshEpoch(pub RwSignal<u64>);
 
@@ -38,12 +42,25 @@ pub fn remote(endpoint: Signal<String>) -> Remote {
     #[cfg(target_arch = "wasm32")]
     {
         let generation = RwSignal::new(0u64);
+        let mut first_run = true;
+        let hydration = use_context::<HydrationRequests>();
         let refresh = use_context::<RefreshEpoch>();
         Effect::new(move |_| {
             let url = endpoint.get();
             remote.revision.get();
             if let Some(refresh) = refresh {
                 refresh.0.get();
+            }
+            if std::mem::take(&mut first_run)
+                && !remote.data.get_untracked().is_null()
+                && hydration.is_some_and(|requests| {
+                    requests
+                        .0
+                        .try_update_value(|urls| urls.remove(&url))
+                        .unwrap_or(false)
+                })
+            {
+                return;
             }
             generation.update(|value| *value += 1);
             let request_id = generation.get_untracked();

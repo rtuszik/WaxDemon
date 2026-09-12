@@ -82,6 +82,7 @@ pub fn router(state: AuthState) -> Router {
         .layer(middleware::from_fn(enforce_deadline))
         .layer(auth)
         .layer(middleware::from_fn(security_headers))
+        .layer(tower_http::compression::CompressionLayer::new())
         .with_state(state)
 }
 

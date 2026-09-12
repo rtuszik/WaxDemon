@@ -23,7 +23,7 @@ run = "oxfmt -c .oxfmtrc.json ."
 
 [tasks.clippy]
 description = "Clippy with -D warnings across all targets"
-run = "cargo clippy --workspace --all-targets -- -D warnings"
+run = "cargo clippy --workspace --all-targets --all-features -- -D warnings"
 
 [tasks.test]
 description = "Run the full test suite. Needs TEST_DATABASE_URL for db-backed tests."

@@ -184,6 +184,7 @@ pub(super) async fn filters(
 #[derive(Deserialize)]
 pub(super) struct Range {
     range: Option<String>,
+    history_page: Option<u32>,
 }
 
 pub(super) async fn dashboard(
@@ -192,6 +193,10 @@ pub(super) async fn dashboard(
     Query(range): Query<Range>,
 ) -> Result<Json<Value>, AuthError> {
     let user = approved(&auth)?.id;
+    let history_page = range.history_page.unwrap_or(1);
+    if history_page == 0 {
+        return Err(bad_request());
+    }
     let days = match range.range.as_deref().unwrap_or("all") {
         "all" => None,
         "1m" => Some(30),
@@ -207,8 +212,17 @@ pub(super) async fn dashboard(
             .await?;
     let values:Vec<Value>=sqlx::query_scalar("SELECT jsonb_build_object('currency',currency,'valued_items',count(*),'total',sum(suggested_value)::text) FROM user_collection_items WHERE user_id=$1 AND suggested_value IS NOT NULL GROUP BY currency ORDER BY currency")
         .bind(user).fetch_all(&state.pool).await?;
-    let history:Vec<Value>=sqlx::query_scalar("SELECT jsonb_build_object('timestamp',timestamp,'total_items',total_items,'minimum',value_min::text,'median',value_median::text,'maximum',value_max::text,'currency',currency) FROM user_collection_history WHERE user_id=$1 AND ($2::int IS NULL OR timestamp::timestamptz>=now()-make_interval(days=>$2)) ORDER BY timestamp::timestamptz")
+    let history: Vec<Value> = sqlx::query_scalar("WITH ranked AS (
+        SELECT *, row_number() OVER (PARTITION BY currency ORDER BY timestamp::timestamptz, timestamp) AS rn,
+        count(*) OVER (PARTITION BY currency) AS n
+        FROM user_collection_history WHERE user_id=$1 AND ($2::int IS NULL OR timestamp::timestamptz>=now()-make_interval(days=>$2))
+    ) SELECT jsonb_build_object('timestamp',timestamp,'total_items',total_items,'minimum',value_min::text,'median',value_median::text,'maximum',value_max::text,'currency',currency)
+    FROM ranked WHERE rn=n OR (rn-1)%GREATEST(1,ceil(n/998.0)::bigint)=0 ORDER BY timestamp::timestamptz,timestamp")
         .bind(user).bind(days).fetch_all(&state.pool).await?;
+    let history_total: i64 = sqlx::query_scalar("SELECT count(*) FROM user_collection_history WHERE user_id=$1 AND ($2::int IS NULL OR timestamp::timestamptz>=now()-make_interval(days=>$2))")
+        .bind(user).bind(days).fetch_one(&state.pool).await?;
+    let history_rows: Vec<Value> = sqlx::query_scalar("SELECT jsonb_build_object('timestamp',timestamp,'total_items',total_items,'minimum',value_min::text,'median',value_median::text,'maximum',value_max::text,'currency',currency) FROM user_collection_history WHERE user_id=$1 AND ($2::int IS NULL OR timestamp::timestamptz>=now()-make_interval(days=>$2)) ORDER BY timestamp::timestamptz DESC,timestamp DESC LIMIT 50 OFFSET $3")
+        .bind(user).bind(days).bind(i64::from(history_page-1)*50).fetch_all(&state.pool).await?;
     let formats:Vec<Value>=sqlx::query_scalar("SELECT jsonb_build_object('name',COALESCE(r.format,'Unknown'),'count',count(*)) FROM user_collection_items i JOIN releases r ON r.id=i.release_id WHERE i.user_id=$1 GROUP BY r.format ORDER BY count(*) DESC")
         .bind(user).fetch_all(&state.pool).await?;
     let genres:Vec<Value>=sqlx::query_scalar("SELECT jsonb_build_object('name',genre,'count',count(*)) FROM user_collection_items i JOIN releases r ON r.id=i.release_id CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(NULLIF(r.genres,'')::jsonb,'[]'::jsonb)) genre WHERE i.user_id=$1 GROUP BY genre ORDER BY count(*) DESC")
@@ -238,7 +252,7 @@ pub(super) async fn dashboard(
         .fetch_all(&state.pool)
         .await?;
     Ok(Json(
-        json!({"total_items":total,"values":values,"history":history,"formats":formats,"genres":genres,"years":years,"summaries":summaries,"rankings":rankings,"additions":additions,"display_currency":display_currency}),
+        json!({"total_items":total,"values":values,"history":history,"history_rows":history_rows,"history_total":history_total,"history_page":history_page,"formats":formats,"genres":genres,"years":years,"summaries":summaries,"rankings":rankings,"additions":additions,"display_currency":display_currency}),
     ))
 }
 

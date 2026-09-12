@@ -73,18 +73,25 @@ fn EstimateLabel(condition: Option<String>) -> impl IntoView {
 
 #[component]
 fn HistoryTable(data: Remote) -> impl IntoView {
-    let page = RwSignal::new(0usize);
-    let history = Memo::new(move |_| {
-        data.data.get()["history"]
-            .as_array()
-            .cloned()
-            .unwrap_or_default()
-    });
-    Effect::new(move |_| {
-        history.track();
-        page.set(0);
-    });
-    view! {<section class="panel history-table"><h3>"Collection valuation history"</h3><p class="muted">"Median is the Discogs collection estimate. Different currencies are never combined."</p><div class="table-scroll"><table><thead><tr><th>"Date"</th><th>"Records"</th><th>"Minimum"</th><th>"Median"</th><th>"Maximum"</th></tr></thead><tbody>{move ||history.get().into_iter().rev().skip(page.get()*50).take(50).map(|v|view!{<tr><td>{text(&v,"timestamp")}</td><td>{v["total_items"].as_i64()}</td><td>{money(v["minimum"].as_str(),v["currency"].as_str())}</td><td>{money(v["median"].as_str(),v["currency"].as_str())}</td><td>{money(v["maximum"].as_str(),v["currency"].as_str())}</td></tr>}).collect_view()}</tbody></table></div><nav class="pagination" aria-label="History pages"><button disabled=move ||page.get()==0 on:click=move |_|page.update(|p|*p=p.saturating_sub(1))>"Previous"</button><span>{move ||format!("Page {} of {}",page.get()+1,history.get().len().div_ceil(50).max(1))}</span><button disabled=move ||(page.get()+1)*50>=history.get().len() on:click=move |_|page.update(|p|*p+=1)>"Next"</button></nav></section>}
+    let location = use_location();
+    let page = Signal::derive(move || data.data.get()["history_page"].as_u64().unwrap_or(1));
+    let total = Signal::derive(move || data.data.get()["history_total"].as_u64().unwrap_or(0));
+    let page_url = move |page: u64| {
+        let search = location.search.get();
+        let mut query: Vec<(String, String)> =
+            url::form_urlencoded::parse(search.trim_start_matches('?').as_bytes())
+                .filter(|(key, _)| key != "history_page")
+                .map(|(k, v)| (k.into_owned(), v.into_owned()))
+                .collect();
+        query.push(("history_page".into(), page.to_string()));
+        format!(
+            "/?{}",
+            url::form_urlencoded::Serializer::new(String::new())
+                .extend_pairs(query)
+                .finish()
+        )
+    };
+    view! {<section class="panel history-table"><h3>"Collection valuation history"</h3><p class="muted">"Charts sample large histories. Every snapshot is available in this table. Different currencies are never combined."</p><div class="table-scroll"><table><thead><tr><th>"Date"</th><th>"Records"</th><th>"Minimum"</th><th>"Median"</th><th>"Maximum"</th></tr></thead><tbody>{move ||data.data.get()["history_rows"].as_array().cloned().unwrap_or_default().into_iter().map(|v|view!{<tr><td>{text(&v,"timestamp")}</td><td>{v["total_items"].as_i64()}</td><td>{money(v["minimum"].as_str(),v["currency"].as_str())}</td><td>{money(v["median"].as_str(),v["currency"].as_str())}</td><td>{money(v["maximum"].as_str(),v["currency"].as_str())}</td></tr>}).collect_view()}</tbody></table></div><nav class="pagination" aria-label="History pages">{move ||(page.get()>1).then(||view!{<A href=page_url(page.get()-1)>"Previous"</A>})}<span>{move ||format!("Page {} of {}",page.get(),total.get().div_ceil(50).max(1))}</span>{move ||(page.get()*50<total.get()).then(||view!{<A href=page_url(page.get()+1)>"Next"</A>})}</nav></section>}
 }
 
 #[component]

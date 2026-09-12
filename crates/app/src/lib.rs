@@ -76,14 +76,14 @@ pub fn shell(options: LeptosOptions, bootstrap: Bootstrap) -> impl IntoView {
             <link rel="icon" href="/assets/favicon.ico"/>
             <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png"/>
             <link rel="manifest" href="/assets/site.webmanifest"/>
-            <script src="/assets/echarts-6.1.0.min.js"></script>
+            <script defer src="/assets/echarts-6.1.0.min.js"></script>
             <HydrationScripts options/>
             <leptos_meta::MetaTags/>
         </head><body><App/><script id="wax-bootstrap" type="application/json" inner_html=json></script></body></html>
     }
 }
 
-#[cfg(feature = "hydrate")]
+#[cfg(all(feature = "hydrate", target_arch = "wasm32"))]
 #[wasm_bindgen::prelude::wasm_bindgen]
 pub fn hydrate() {
     let bootstrap = leptos::prelude::document()
@@ -92,6 +92,9 @@ pub fn hydrate() {
         .and_then(|s| serde_json::from_str::<Bootstrap>(&s).ok())
         .unwrap_or_default();
     leptos::mount::hydrate_body(move || {
+        provide_context(crate::remote::HydrationRequests(StoredValue::new(
+            bootstrap.data.keys().cloned().collect(),
+        )));
         provide_context(bootstrap.clone());
         view! {<App/>}
     });
