@@ -186,7 +186,7 @@ fn SyncPanel() -> impl IntoView {
     view! {<section class="sync-strip panel"><div><strong>"Discogs sync"</strong><p class="muted" role="status">{move ||{
         let run=data.data.get()["run"].clone();
         if run.is_null(){"No sync yet. Import your collection to get started.".into()}else{format!("{} · {} · {} / {}",text(&run,"status"),text(&run,"phase"),run["processed"].as_i64().unwrap_or(0),run["total"].as_i64().unwrap_or(0))}
-    }}</p><span class="error">{move ||data.data.get()["run"]["error"].as_str().map(str::to_owned)}</span></div><MutationButton action="/api/sync".into() label="Sync now" refresh=data/><Status remote=data/></section>}
+    }}</p><span class="error">{move ||data.data.get()["run"]["error"].as_str().map(str::to_owned)}</span><Status remote=data/></div><MutationButton action="/api/sync".into() label="Sync now" refresh=data/></section>}
 }
 
 #[component]
