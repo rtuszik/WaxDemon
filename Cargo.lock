@@ -4461,7 +4461,7 @@ name = "waxdemon-discogs"
 version = "0.4.0"
 dependencies = [
  "oauth1-request",
- "rand 0.9.4",
+ "rand 0.10.1",
  "reqwest",
  "rust_decimal",
  "secrecy",
