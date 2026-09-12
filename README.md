@@ -2,7 +2,7 @@
 
 Self-hosted dashboard for your Discogs collection. Tracks collection value over time and other statistics over time.
 
-Zero NodeJS.
+Per-user collections with Discogs OAuth; other users require administrator approval.
 
 > [!WARNING]
 > This project is significantly AI-Supported.
@@ -13,60 +13,59 @@ Zero NodeJS.
 The chart is published as an OCI artifact to GitHub Container Registry on every
 release. Install it directly — no `helm repo add` required (Helm 3.8+):
 
-```bash
-helm install waxdemon oci://ghcr.io/rtuszik/waxdemon/waxdemon \
-  --version 0.3.1 \
-  --set secrets.databaseUrl='postgres://user:pass@host:5432/waxdemon' \
-  --set secrets.discogsToken='your_discogs_token' \
-  --set config.DISCOGS_USERNAME='your_handle'
-```
-
-Pick a version from the [releases page](https://github.com/rtuszik/WaxDemon/releases).
-
 In production prefer a pre-existing Secret managed by your secrets stack:
 
 ```bash
 helm install waxdemon oci://ghcr.io/rtuszik/waxdemon/waxdemon \
-  --version 0.3.1 \
+  --version 1.0.0 \
   --set secrets.existingSecret=waxdemon-secrets \
+  --set config.PUBLIC_URL='https://waxdemon.example.com' \
   --set config.DISCOGS_USERNAME='your_handle'
 ```
 
-To install from the working tree (e.g., when iterating on the chart locally),
-point `helm install` at `./charts/waxdemon` instead of the OCI URL.
-
-The Secret must contain keys `DATABASE_URL` and (optionally) `DISCOGS_TOKEN`. See
-`charts/waxdemon/values.yaml` for ingress, HTTPRoute, autoscaling, probe, and
-resource knobs.
+The Secret must contain keys `DATABASE_URL`, `DISCOGS_CONSUMER_KEY`,
+`DISCOGS_CONSUMER_SECRET` and `keyring.json`. See `charts/waxdemon/values.yaml`.
 
 ## Running with Docker Compose
 
 ```bash
 # copy example env variables
 cp .env.example .env
-
-docker compose up -d
 ```
+
+Fill in `.env` and create the keyring at `OAUTH_KEYRING_SOURCE`, then run
+`docker compose up -d`.
 
 ## Running from source
 
+Export the variables below:
+
 ```bash
-export DATABASE_URL=postgres://user:pass@host/waxdemon
-export DISCOGS_USERNAME=your_handle
-export DISCOGS_TOKEN=your_token
-# Optional: SYNC_CRON_SCHEDULE, 6-field cron (sec min hour dom mon dow)
+mise run frontend
 cargo run --release -p waxdemon-server
 ```
 
 Config is done via environment variables:
 
-| Var                  | Required | Default        | Purpose                       |
-| -------------------- | -------- | -------------- | ----------------------------- |
-| `DATABASE_URL`       | yes      | —              | Postgres connection string    |
-| `DISCOGS_USERNAME`   | for sync | —              | Your Discogs handle           |
-| `DISCOGS_TOKEN`      | for sync | —              | Personal access token         |
-| `SYNC_CRON_SCHEDULE` | no       | `0 0 0 * * *`  | Schedule for automatic syncs  |
-| `BIND_ADDR`          | no       | `0.0.0.0:3000` | Where the HTTP server listens |
+| Var                                               | Required                | Purpose                                               |
+| ------------------------------------------------- | ----------------------- | ----------------------------------------------------- |
+| `DATABASE_URL`                                    | yes                     | Postgres connection string                            |
+| `PUBLIC_URL`                                      | yes                     | Public origin; OAuth callback is `/auth/callback`     |
+| `DISCOGS_CONSUMER_KEY`, `DISCOGS_CONSUMER_SECRET` | yes                     | Discogs application credentials                       |
+| `DISCOGS_USERNAME`                                | until first owner login | Administrator's Discogs handle                        |
+| `OAUTH_ACTIVE_KEY_ID`                             | yes                     | Active keyring ID (`primary` in Helm/Compose)         |
+| `OAUTH_KEYRING_FILE`                              | yes                     | Keyring JSON file path                                |
+| `BIND_ADDR`                                       | no                      | Where the HTTP server listens; default `0.0.0.0:3000` |
+
+Keyring JSON (64-character hex keys): `{"primary":"<openssl rand -hex 32 output>"}`.
+Set per-user sync intervals in Settings.
+
+## Upgrading to 1.0.0
+
+Stop the old version and back up the database. Configure OAuth and the keyring, keeping `DISCOGS_USERNAME` set to the existing collection owner.
+Schema migrations run at startup. That owner's first OAuth login imports the
+collection, history and settings and creates the administrator.
+`DISCOGS_TOKEN` and `SYNC_CRON_SCHEDULE` are no longer used.
 
 ## Architecture
 
@@ -76,30 +75,6 @@ crates/
 ├── db           sqlx + migrations (Postgres)
 ├── discogs      reqwest client: retry/backoff, pagination
 ├── sync         orchestrator
-├── scheduler    tokio-cron-scheduler driving periodic syncs
-└── server       Axum HTTP + Leptos SSR views + apexcharts
+├── app          Leptos SSR/WASM + ECharts
+└── server       Axum HTTP + OAuth + Apalis background jobs
 ```
-
-## Testing
-
-Unit tests run without any infra:
-
-```bash
-cargo test --workspace
-```
-
-DB and end-to-end tests run against a Postgres pointed at by `TEST_DATABASE_URL`:
-
-```bash
-TEST_DATABASE_URL=postgres://ddtest:ddtest@localhost:5432/waxdemon_test \
-  cargo test --workspace -- --test-threads=1
-```
-
-## Releasing
-
-Releases are created automatically by Cocogitto when Conventional Commits are
-merged to `main`:
-
-- `fix:` produces a patch release.
-- `feat:` produces a minor release.
-- A `BREAKING CHANGE:` footer or `!` after the commit type produces a major release.
