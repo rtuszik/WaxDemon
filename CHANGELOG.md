@@ -2,6 +2,26 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v1.0.0 - 2026-09-12
+#### Features
+- (**auth**) import legacy data on first owner OAuth login - (a330747) - Robin Tuszik
+- (**auth**) add Discogs OAuth authentication and session management - (cbff80e) - Robin Tuszik
+- (**db**) add multi-user legacy data migration workflow - (d865120) - Robin Tuszik
+- (**release**) support manual version bumps and custom release notes [skip ci] - (ba85bac) - Robin Tuszik
+- (**ui**) add library browser and ECharts dashboard - (41bb6c7) - Robin Tuszik
+- <span style="background-color: #d73a49; color: white; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 0.85em;">BREAKING</span>configure OAuth secrets and production frontend build - (de0dfe7) - Robin Tuszik
+- add multi-user OAuth collection sync and job processing - (f89d465) - Robin Tuszik
+- add secure Discogs OAuth credential storage - (74b15e2) - Robin Tuszik
+- add rust-analyzer tool configuration - (4a0c821) - Robin Tuszik
+#### Documentation
+- update OAuth setup and upgrade instructions - (c83b91b) - Robin Tuszik
+#### Continuous Integration
+- add WASM, browser and deployment checks - (b6f0870) - Robin Tuszik
+#### Style
+- (**dashboard**) adjust chart time range spacing - (3f4557a) - Robin Tuszik
+
+- - -
+
 ## v0.3.1 - 2026-08-30
 #### Bug Fixes
 - (**changelog**) restore cocogitto separators and exclude from oxfmt - (4fe14e3) - Robin Tuszik
