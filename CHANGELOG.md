@@ -2,6 +2,18 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.1.0](https://github.com/rtuszik/WaxDemon/compare/9b5264b0b1bb1ec5a7794385363672002405ff13..v1.1.0) - 2026-09-12
+#### Features
+- (**dashboard**) paginate history and compress API responses - ([690e439](https://github.com/rtuszik/WaxDemon/commit/690e439d8a0e3c70e01a7130212108c95c42cb9e)) - [@rtuszik](https://github.com/rtuszik)
+#### Continuous Integration
+- remove Rust tools from cocogitto validation workflow - ([23a7704](https://github.com/rtuszik/WaxDemon/commit/23a770461d84a8f04ac6930290bb8db7f47161b6)) - [@rtuszik](https://github.com/rtuszik)
+#### Miscellaneous Chores
+- (**changelog**) configure GitHub author links in changelog generation - ([9b5264b](https://github.com/rtuszik/WaxDemon/commit/9b5264b0b1bb1ec5a7794385363672002405ff13)) - [@rtuszik](https://github.com/rtuszik)
+#### Style
+- (**ui**) align sync status beneath sync details - ([948d2c2](https://github.com/rtuszik/WaxDemon/commit/948d2c225c7ff86cf836e4f3960f91a9b9d90ce3)) - [@rtuszik](https://github.com/rtuszik)
+
+- - -
+
 ## v1.0.0 - 2026-09-12
 #### Features
 - (**auth**) import legacy data on first owner OAuth login - (a330747) - [@rtuszik](https://github.com/rtuszik)

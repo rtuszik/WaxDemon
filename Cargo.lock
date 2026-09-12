@@ -4491,7 +4491,7 @@ dependencies = [
 
 [[package]]
 name = "waxdemon-app"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "gloo-net 0.7.0",
  "js-sys",
@@ -4509,14 +4509,14 @@ dependencies = [
 
 [[package]]
 name = "waxdemon-core"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "waxdemon-db"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4530,7 +4530,7 @@ dependencies = [
 
 [[package]]
 name = "waxdemon-discogs"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "oauth1-request",
  "rand 0.9.4",
@@ -4548,7 +4548,7 @@ dependencies = [
 
 [[package]]
 name = "waxdemon-server"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "any_spawner",
  "anyhow",
@@ -4589,7 +4589,7 @@ dependencies = [
 
 [[package]]
 name = "waxdemon-sync"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "chrono",
