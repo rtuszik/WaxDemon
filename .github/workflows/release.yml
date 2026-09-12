@@ -5,6 +5,13 @@ on:
     push:
         branches: [main]
     pull_request:
+    workflow_dispatch:
+        inputs:
+            bump:
+                description: Version bump
+                type: choice
+                default: auto
+                options: [auto, major, minor, patch]
 
 concurrency:
     group: release-main
@@ -37,7 +44,7 @@ jobs:
               run: cog check --from-latest-tag --ignore-merge-commits
 
     release:
-        if: github.event_name == 'push'
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         runs-on: ubuntu-latest
         permissions:
             contents: write
@@ -64,9 +71,15 @@ jobs:
 
             - name: Determine whether a release is needed
               id: plan
+              env:
+                  BUMP: ${{ inputs.bump || 'auto' }}
               run: |
+                  case "$BUMP" in
+                      auto|major|minor|patch) ;;
+                      *) echo "Invalid bump: $BUMP" >&2; exit 1 ;;
+                  esac
                   current_version="$(cog -v get-version)"
-                  target_version="$(cog bump --auto --dry-run | sed -nE 's/^v?([0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?)$/\1/p' | tail -n 1)"
+                  target_version="$(cog bump "--${BUMP}" --dry-run | sed -nE 's/^v?([0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?)$/\1/p' | tail -n 1)"
 
                   if [[ -z "$target_version" ]]; then
                       echo "released=false" >> "$GITHUB_OUTPUT"
@@ -83,10 +96,18 @@ jobs:
 
             - name: Create version commit and tag
               if: steps.plan.outputs.released == 'true'
+              env:
+                  RELEASE_VERSION: ${{ steps.plan.outputs.version }}
               run: |
                   git config user.name github-actions[bot]
                   git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-                  cog bump --auto --skip-ci
+                  cog bump --version "$RELEASE_VERSION" --skip-ci
+
+            - name: Generate release notes
+              if: steps.plan.outputs.released == 'true'
+              env:
+                  RELEASE_VERSION: ${{ steps.plan.outputs.version }}
+              run: cog changelog --at "v${RELEASE_VERSION}" --template full_hash > "$RUNNER_TEMP/release-notes.md"
 
             - name: Push version commit and tag
               if: steps.plan.outputs.released == 'true'
@@ -96,7 +117,7 @@ jobs:
 
             - name: Create GitHub Release
               if: steps.plan.outputs.released == 'true'
-              run: gh release create "v${RELEASE_VERSION}" --generate-notes
+              run: gh release create "v${RELEASE_VERSION}" --verify-tag --notes-file "$RUNNER_TEMP/release-notes.md"
               env:
                   GH_TOKEN: ${{ github.token }}
                   RELEASE_VERSION: ${{ steps.plan.outputs.version }}
@@ -107,6 +128,6 @@ jobs:
         permissions:
             contents: read
             packages: write
-        uses: ./.github/workflows/publish.yml
+        uses: $/.github/workflows/publish.yml
         with:
             version: ${{ needs.release.outputs.version }}
