@@ -88,9 +88,9 @@ backend = "npm:oxfmt"
 specifiers = ["0.64.0"]
 
 [[tools.rust]]
-version = "1.97.1"
+version = "1.98.1"
 backend = "core:rust"
-specifiers = ["1.97.1"]
+specifiers = ["1.98.1"]
 
 [[tools.rust-analyzer]]
 version = "2026-09-07"
