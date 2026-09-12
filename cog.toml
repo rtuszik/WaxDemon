@@ -5,3 +5,13 @@ pre_bump_hooks = [
     "cargo check --release",
     "scripts/bump-version {{version}}",
 ]
+
+[changelog]
+template = "remote"
+remote = "github.com"
+owner = "rtuszik"
+repository = "WaxDemon"
+
+[[changelog.authors]]
+signature = "Robin Tuszik"
+username = "rtuszik"

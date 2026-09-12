@@ -4,56 +4,56 @@ All notable changes to this project will be documented in this file. See [conven
 - - -
 ## v1.0.0 - 2026-09-12
 #### Features
-- (**auth**) import legacy data on first owner OAuth login - (a330747) - Robin Tuszik
-- (**auth**) add Discogs OAuth authentication and session management - (cbff80e) - Robin Tuszik
-- (**db**) add multi-user legacy data migration workflow - (d865120) - Robin Tuszik
-- (**release**) support manual version bumps and custom release notes [skip ci] - (ba85bac) - Robin Tuszik
-- (**ui**) add library browser and ECharts dashboard - (41bb6c7) - Robin Tuszik
-- <span style="background-color: #d73a49; color: white; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 0.85em;">BREAKING</span>configure OAuth secrets and production frontend build - (de0dfe7) - Robin Tuszik
-- add multi-user OAuth collection sync and job processing - (f89d465) - Robin Tuszik
-- add secure Discogs OAuth credential storage - (74b15e2) - Robin Tuszik
-- add rust-analyzer tool configuration - (4a0c821) - Robin Tuszik
+- (**auth**) import legacy data on first owner OAuth login - (a330747) - [@rtuszik](https://github.com/rtuszik)
+- (**auth**) add Discogs OAuth authentication and session management - (cbff80e) - [@rtuszik](https://github.com/rtuszik)
+- (**db**) add multi-user legacy data migration workflow - (d865120) - [@rtuszik](https://github.com/rtuszik)
+- (**release**) support manual version bumps and custom release notes [skip ci] - (ba85bac) - [@rtuszik](https://github.com/rtuszik)
+- (**ui**) add library browser and ECharts dashboard - (41bb6c7) - [@rtuszik](https://github.com/rtuszik)
+- <span style="background-color: #d73a49; color: white; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 0.85em;">BREAKING</span>configure OAuth secrets and production frontend build - (de0dfe7) - [@rtuszik](https://github.com/rtuszik)
+- add multi-user OAuth collection sync and job processing - (f89d465) - [@rtuszik](https://github.com/rtuszik)
+- add secure Discogs OAuth credential storage - (74b15e2) - [@rtuszik](https://github.com/rtuszik)
+- add rust-analyzer tool configuration - (4a0c821) - [@rtuszik](https://github.com/rtuszik)
 #### Documentation
-- update OAuth setup and upgrade instructions - (c83b91b) - Robin Tuszik
+- update OAuth setup and upgrade instructions - (c83b91b) - [@rtuszik](https://github.com/rtuszik)
 #### Continuous Integration
-- add WASM, browser and deployment checks - (b6f0870) - Robin Tuszik
+- add WASM, browser and deployment checks - (b6f0870) - [@rtuszik](https://github.com/rtuszik)
 #### Style
-- (**dashboard**) adjust chart time range spacing - (3f4557a) - Robin Tuszik
+- (**dashboard**) adjust chart time range spacing - (3f4557a) - [@rtuszik](https://github.com/rtuszik)
 
 - - -
 
 ## v0.3.1 - 2026-08-30
 #### Bug Fixes
-- (**changelog**) restore cocogitto separators and exclude from oxfmt - (4fe14e3) - Robin Tuszik
-- (**docker**) correct PostgreSQL data volume mount path - (fa7f388) - Robin Tuszik
+- (**changelog**) restore cocogitto separators and exclude from oxfmt - (4fe14e3) - [@rtuszik](https://github.com/rtuszik)
+- (**docker**) correct PostgreSQL data volume mount path - (fa7f388) - [@rtuszik](https://github.com/rtuszik)
 #### Documentation
-- remove outdated release workflow documentation - (8cc8939) - Robin Tuszik
+- remove outdated release workflow documentation - (8cc8939) - [@rtuszik](https://github.com/rtuszik)
 #### Build system
-- automate Cargo version updates during releases - (e52949b) - Robin Tuszik
+- automate Cargo version updates during releases - (e52949b) - [@rtuszik](https://github.com/rtuszik)
 #### Continuous Integration
-- add pre-commit hooks for code quality checks - (7fcaaa4) - Robin Tuszik
+- add pre-commit hooks for code quality checks - (7fcaaa4) - [@rtuszik](https://github.com/rtuszik)
 #### Refactoring
-- (**core**) simplify empty format handling - (2864127) - Robin Tuszik
+- (**core**) simplify empty format handling - (2864127) - [@rtuszik](https://github.com/rtuszik)
 #### Miscellaneous Chores
-- harden containers and release workflows - (68f3c27) - Robin Tuszik
-- add opengrep and zizmor tooling with oxfmt task - (c7c6c41) - Robin Tuszik
+- harden containers and release workflows - (68f3c27) - [@rtuszik](https://github.com/rtuszik)
+- add opengrep and zizmor tooling with oxfmt task - (c7c6c41) - [@rtuszik](https://github.com/rtuszik)
 
 - - -
 
 ## v0.3.0 - 2026-08-24
 #### Features
-- (**dashboard**) add selectable chart history ranges - (e861f56) - Robin Tuszik
+- (**dashboard**) add selectable chart history ranges - (e861f56) - [@rtuszik](https://github.com/rtuszik)
 #### Tests
-- update dashboard stats empty history assertion - (68d7cd8) - Robin Tuszik
+- update dashboard stats empty history assertion - (68d7cd8) - [@rtuszik](https://github.com/rtuszik)
 #### Continuous Integration
-- update release workflow and tag push handling - (21e6b5a) - Robin Tuszik
-- manage Cocogitto with mise in release workflow - (da7f499) - Robin Tuszik
-- validate SemVer output in release workflow - (08ad57f) - Robin Tuszik
-- set package publishing workflow permissions - (9ce14b4) - Robin Tuszik
-- automate releases and publishing via Conventional Commits - (da1e5d0) - Robin Tuszik
+- update release workflow and tag push handling - (21e6b5a) - [@rtuszik](https://github.com/rtuszik)
+- manage Cocogitto with mise in release workflow - (da7f499) - [@rtuszik](https://github.com/rtuszik)
+- validate SemVer output in release workflow - (08ad57f) - [@rtuszik](https://github.com/rtuszik)
+- set package publishing workflow permissions - (9ce14b4) - [@rtuszik](https://github.com/rtuszik)
+- automate releases and publishing via Conventional Commits - (da1e5d0) - [@rtuszik](https://github.com/rtuszik)
 #### Miscellaneous Chores
 - (**version**) v0.3.0 [skip ci] - (ac12b4f) - github-actions[bot]
-- add AGENTS.md symlink to CLAUDE.md - (b7588dd) - Robin Tuszik
+- add AGENTS.md symlink to CLAUDE.md - (b7588dd) - [@rtuszik](https://github.com/rtuszik)
 
 - - -
 
