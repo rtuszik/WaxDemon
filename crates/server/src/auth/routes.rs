@@ -355,22 +355,6 @@ async fn delete_account(
             return Err(AuthError::LastAdmin);
         }
     }
-    let legacy: bool =
-        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM legacy_import WHERE user_id=$1)")
-            .bind(id)
-            .fetch_one(&mut *tx)
-            .await?;
-    if legacy {
-        sqlx::query("DELETE FROM collection_items")
-            .execute(&mut *tx)
-            .await?;
-        sqlx::query("DELETE FROM collection_stats_history")
-            .execute(&mut *tx)
-            .await?;
-        sqlx::query("DELETE FROM settings")
-            .execute(&mut *tx)
-            .await?;
-    }
     sqlx::query("DELETE FROM app_sessions WHERE data->'axum-login.data'->>'user_id'=$1")
         .bind(id.to_string())
         .execute(&mut *tx)

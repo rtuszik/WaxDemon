@@ -5,6 +5,10 @@ use waxdemon_db::legacy_import::{ImportMode, import_legacy};
 static NEXT_SCHEMA: AtomicU64 = AtomicU64::new(0);
 
 async fn fixture() -> Option<(sqlx::PgPool, sqlx::PgPool, String)> {
+    fixture_with_cleanup(true).await
+}
+
+async fn fixture_with_cleanup(apply_cleanup: bool) -> Option<(sqlx::PgPool, sqlx::PgPool, String)> {
     let url = std::env::var("TEST_DATABASE_URL").ok()?;
     let admin = PgPoolOptions::new()
         .max_connections(1)
@@ -53,8 +57,25 @@ async fn fixture() -> Option<(sqlx::PgPool, sqlx::PgPool, String)> {
           ('2025-01-01T00:00:00Z', 3, NULL, NULL, NULL);
          INSERT INTO settings VALUES ('sync_status', 'running'), ('custom', NULL);",
     ).execute(&pool).await.unwrap();
-    waxdemon_db::run_migrations(&pool).await.unwrap();
+    let mut migrations = sqlx::migrate!("./migrations");
+    if !apply_cleanup {
+        migrations.migrations = migrations
+            .iter()
+            .filter(|migration| migration.version < 8)
+            .cloned()
+            .collect::<Vec<_>>()
+            .into();
+    }
+    migrations.run(&pool).await.unwrap();
     Some((pool, admin, schema))
+}
+
+async fn assert_legacy_tables_removed(pool: &sqlx::PgPool) {
+    let remaining: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM information_schema.tables WHERE table_schema=current_schema()
+         AND table_name IN ('collection_items','collection_stats_history','settings','user_settings')",
+    ).fetch_one(pool).await.unwrap();
+    assert_eq!(remaining, 0);
 }
 
 async fn cleanup(pool: sqlx::PgPool, admin: sqlx::PgPool, schema: String) {
@@ -111,38 +132,9 @@ async fn populated_legacy_database_preserves_copies_history_and_unknown_currency
             ("2025-01-01T00:00:00Z".into(), None, None)
         ]
     );
-    let status: String =
-        sqlx::query_scalar("SELECT value FROM user_settings WHERE key = 'sync_status'")
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-    assert_eq!(status, "idle");
-    let old_status: String =
-        sqlx::query_scalar("SELECT value FROM settings WHERE key = 'sync_status'")
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-    assert_eq!(old_status, "running");
-    let old_count: i64 = sqlx::query_scalar("SELECT count(*) FROM collection_items")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-    assert_eq!(old_count, 3);
-    let different: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM (
-          SELECT id::bigint, release_id::bigint, added_date, folder_id::bigint,
-                 rating, notes, condition, suggested_value::text::numeric, last_value_check
-          FROM collection_items
-          EXCEPT ALL
-          SELECT instance_id, release_id, added_date, folder_id,
-                 rating, notes, condition, suggested_value, last_value_check
-          FROM user_collection_items
-        ) differences",
-    )
-    .fetch_one(&pool)
-    .await
-    .unwrap();
-    assert_eq!(different, 0, "all per-copy fields must survive the import");
+    assert_legacy_tables_removed(&pool).await;
+    waxdemon_db::run_migrations(&pool).await.unwrap();
+    assert_legacy_tables_removed(&pool).await;
     cleanup(pool, admin, schema).await;
 }
 
@@ -164,6 +156,11 @@ async fn preview_rolls_back_and_commit_cannot_be_repeated_or_reassigned() {
         .await
         .unwrap();
     assert_eq!(receipt, 0);
+    let source_count: i64 = sqlx::query_scalar("SELECT count(*) FROM collection_items")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(source_count, 3);
     import_legacy(&pool, 123, "owner", ImportMode::Commit)
         .await
         .unwrap();
@@ -326,5 +323,144 @@ async fn stores_multiple_currencies_without_overwriting_another_quote() {
             .await
             .unwrap();
     assert_eq!(currencies, ["EUR", "USD"]);
+    cleanup(pool, admin, schema).await;
+}
+
+#[tokio::test]
+async fn upgrade_cleans_completed_import_without_overwriting_current_data() {
+    let Some((pool, admin, schema)) = fixture_with_cleanup(false).await else {
+        return;
+    };
+    sqlx::raw_sql(
+        "INSERT INTO users (discogs_id,username,role,status) VALUES (123,'owner','admin','approved');
+         INSERT INTO releases (id,title) VALUES (42,'Updated title');
+         INSERT INTO user_collection_items (user_id,instance_id,release_id,added_date,notes)
+         SELECT id,10,42,'2026-01-01','Changed since import' FROM users;
+         INSERT INTO user_collection_history (user_id,timestamp,total_items,value_median,currency)
+         SELECT id,'2026-01-01',1,99,'EUR' FROM users;
+         INSERT INTO user_preferences (user_id,sync_interval_hours) SELECT id,48 FROM users;
+         INSERT INTO user_settings (user_id,key,value) SELECT id,'sync_status','idle' FROM users;
+         INSERT INTO legacy_import (user_id,item_count,release_count,history_count,setting_count)
+         SELECT id,3,2,2,2 FROM users;",
+    ).execute(&pool).await.unwrap();
+    waxdemon_db::run_migrations(&pool).await.unwrap();
+    assert_legacy_tables_removed(&pool).await;
+    let current: (String, String, String, i32) = sqlx::query_as(
+        "SELECT r.title,i.notes,h.value_median::text,p.sync_interval_hours
+         FROM user_collection_items i JOIN releases r ON r.id=i.release_id
+         JOIN user_collection_history h ON h.user_id=i.user_id
+         JOIN user_preferences p ON p.user_id=i.user_id",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        current,
+        (
+            "Updated title".into(),
+            "Changed since import".into(),
+            "99".into(),
+            48
+        )
+    );
+    let count: i64 = sqlx::query_scalar("SELECT item_count FROM legacy_import")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 3);
+    waxdemon_db::run_migrations(&pool).await.unwrap();
+    assert_legacy_tables_removed(&pool).await;
+    cleanup(pool, admin, schema).await;
+}
+
+#[tokio::test]
+async fn upgrade_removes_empty_legacy_tables_without_claiming_an_owner() {
+    let Some((pool, admin, schema)) = fixture_with_cleanup(false).await else {
+        return;
+    };
+    sqlx::raw_sql(
+        "DELETE FROM collection_items; DELETE FROM collection_stats_history; DELETE FROM settings;",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    waxdemon_db::run_migrations(&pool).await.unwrap();
+    assert_legacy_tables_removed(&pool).await;
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM users")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 0);
+    let report = import_legacy(&pool, 123, "owner", ImportMode::Commit)
+        .await
+        .unwrap();
+    assert_eq!(
+        (
+            report.item_count,
+            report.release_count,
+            report.history_count,
+            report.setting_count
+        ),
+        (0, 0, 0, 0)
+    );
+    assert_legacy_tables_removed(&pool).await;
+    cleanup(pool, admin, schema).await;
+}
+
+#[tokio::test]
+async fn modified_copy_is_rejected_before_removing_source_tables() {
+    let Some((pool, admin, schema)) = fixture().await else {
+        return;
+    };
+    sqlx::raw_sql(
+        "CREATE FUNCTION alter_imported_copy() RETURNS trigger LANGUAGE plpgsql AS $$
+         BEGIN NEW.notes := 'unexpected change'; RETURN NEW; END $$;
+         CREATE TRIGGER alter_imported_copy BEFORE INSERT ON user_collection_items
+         FOR EACH ROW EXECUTE FUNCTION alter_imported_copy();",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    let error = import_legacy(&pool, 123, "owner", ImportMode::Commit)
+        .await
+        .unwrap_err();
+    assert!(error.to_string().contains("data verification failed"));
+    let counts: (i64,i64,i64) = sqlx::query_as(
+        "SELECT (SELECT count(*) FROM collection_items), (SELECT count(*) FROM users), (SELECT count(*) FROM legacy_import)",
+    ).fetch_one(&pool).await.unwrap();
+    assert_eq!(counts, (3, 0, 0));
+    cleanup(pool, admin, schema).await;
+}
+
+#[tokio::test]
+async fn failed_table_drop_rolls_back_the_import_and_receipt() {
+    let Some((pool, admin, schema)) = fixture().await else {
+        return;
+    };
+    sqlx::query("CREATE VIEW dependent_view AS SELECT id FROM collection_items")
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(
+        import_legacy(&pool, 123, "owner", ImportMode::Commit)
+            .await
+            .is_err()
+    );
+    let counts: (i64, i64, i64, i64) = sqlx::query_as(
+        "SELECT (SELECT count(*) FROM collection_items), (SELECT count(*) FROM users),
+         (SELECT count(*) FROM user_collection_items), (SELECT count(*) FROM legacy_import)",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(counts, (3, 0, 0, 0));
+    sqlx::query("DROP VIEW dependent_view")
+        .execute(&pool)
+        .await
+        .unwrap();
+    import_legacy(&pool, 123, "owner", ImportMode::Commit)
+        .await
+        .unwrap();
+    assert_legacy_tables_removed(&pool).await;
     cleanup(pool, admin, schema).await;
 }

@@ -26,10 +26,9 @@ static NEXT_SCHEMA: AtomicU64 = AtomicU64::new(0);
 
 #[tokio::test]
 async fn configured_owner_claims_legacy_data_through_oauth_after_another_signup() {
-    let (pool, admin, schema) = database().await;
-    sqlx::raw_sql("INSERT INTO collection_items (id, release_id, added_date, suggested_value) VALUES (10, 42, '2025-01-01', 12.5), (11, 42, '2025-01-02', 20);
+    let (pool, admin, schema) = database_with_legacy("INSERT INTO collection_items (id, release_id, added_date, suggested_value) VALUES (10, 42, '2025-01-01', 12.5), (11, 42, '2025-01-02', 20);
         INSERT INTO collection_stats_history VALUES ('2025-01-01', 2, 10, 20, 30);
-        INSERT INTO settings VALUES ('sync_status', 'running');").execute(&pool).await.unwrap();
+        INSERT INTO settings VALUES ('sync_status', 'running');").await;
     let server = MockServer::start().await;
     let state = auth_state(&pool, &server)
         .with_legacy_owner(Some("OWNER-123".into()))
@@ -103,17 +102,23 @@ async fn configured_owner_claims_legacy_data_through_oauth_after_another_signup(
     };
     returning.login().await;
     assert_eq!(returning.me().await["user"]["id"], me["user"]["id"]);
-    let counts: (i64, i64) = sqlx::query_as("SELECT (SELECT count(*) FROM user_collection_items), (SELECT count(*) FROM collection_items)").fetch_one(&pool).await.unwrap();
-    assert_eq!(counts, (2, 2));
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM user_collection_items")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 2);
+    assert_legacy_tables_removed(&pool).await;
     cleanup(pool, admin, schema).await;
 }
 
 #[tokio::test]
 async fn oauth_owner_import_and_credentials_roll_back_together_and_can_retry() {
-    let (pool, admin, schema) = database().await;
-    sqlx::raw_sql(
-        "INSERT INTO collection_items (id, release_id, added_date) VALUES (10, 42, '2025-01-01');
-        ALTER TABLE discogs_connections ADD CONSTRAINT reject_credentials CHECK (user_id < 0);",
+    let (pool, admin, schema) = database_with_legacy(
+        "INSERT INTO collection_items (id, release_id, added_date) VALUES (10, 42, '2025-01-01');",
+    )
+    .await;
+    sqlx::query(
+        "ALTER TABLE discogs_connections ADD CONSTRAINT reject_credentials CHECK (user_id < 0)",
     )
     .execute(&pool)
     .await
@@ -135,12 +140,18 @@ async fn oauth_owner_import_and_credentials_roll_back_together_and_can_retry() {
     );
     let counts: (i64, i64, i64, i64) = sqlx::query_as("SELECT (SELECT count(*) FROM users), (SELECT count(*) FROM releases), (SELECT count(*) FROM user_collection_items), (SELECT count(*) FROM legacy_import)").fetch_one(&pool).await.unwrap();
     assert_eq!(counts, (0, 0, 0, 0));
+    let source_count: i64 = sqlx::query_scalar("SELECT count(*) FROM collection_items")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(source_count, 1);
     sqlx::query("ALTER TABLE discogs_connections DROP CONSTRAINT reject_credentials")
         .execute(&pool)
         .await
         .unwrap();
     owner.login().await;
     assert_eq!(owner.me().await["user"]["role"], "admin");
+    assert_legacy_tables_removed(&pool).await;
     cleanup(pool, admin, schema).await;
 }
 
@@ -212,6 +223,7 @@ async fn concurrent_owner_logins_bootstrap_an_empty_database_only_once() {
         .await
         .unwrap();
     assert_eq!(imports, 1);
+    assert_legacy_tables_removed(&pool).await;
     sqlx::query("UPDATE users SET role='user', status='pending'")
         .execute(&pool)
         .await
@@ -708,22 +720,7 @@ async fn deleting_legacy_owner_preserves_import_receipt_and_protects_last_admin(
         .await
         .unwrap();
     sqlx::query("INSERT INTO legacy_import (user_id,item_count,release_count,history_count,setting_count) VALUES ($1,1,1,1,1)").bind(id).execute(&pool).await.unwrap();
-    sqlx::query(
-        "INSERT INTO collection_items (id,release_id,added_date) VALUES (1,1,'2025-01-01')",
-    )
-    .execute(&pool)
-    .await
-    .unwrap();
-    sqlx::query(
-        "INSERT INTO collection_stats_history (timestamp,total_items) VALUES ('2025-01-01',1)",
-    )
-    .execute(&pool)
-    .await
-    .unwrap();
-    sqlx::query("INSERT INTO settings (key,value) VALUES ('owner','legacy')")
-        .execute(&pool)
-        .await
-        .unwrap();
+    assert_legacy_tables_removed(&pool).await;
     let form = format!("csrf={}&confirm=owner-51", info["csrf"].as_str().unwrap());
     assert_eq!(
         owner
@@ -737,7 +734,8 @@ async fn deleting_legacy_owner_preserves_import_receipt_and_protects_last_admin(
             .0,
         StatusCode::CONFLICT
     );
-    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM collection_items")
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM users WHERE id=$1")
+        .bind(id)
         .fetch_one(&pool)
         .await
         .unwrap();
@@ -760,8 +758,19 @@ async fn deleting_legacy_owner_preserves_import_receipt_and_protects_last_admin(
         .await
         .unwrap();
     assert_eq!(receipt, None);
-    let remaining:i64=sqlx::query_scalar("SELECT (SELECT count(*) FROM collection_items)+(SELECT count(*) FROM collection_stats_history)+(SELECT count(*) FROM settings)+(SELECT count(*) FROM app_sessions WHERE data->'axum-login.data'->>'user_id'=$1)").bind(id.to_string()).fetch_one(&pool).await.unwrap();
+    let remaining: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM app_sessions WHERE data->'axum-login.data'->>'user_id'=$1",
+    )
+    .bind(id.to_string())
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     assert_eq!(remaining, 0);
+    assert_legacy_tables_removed(&pool).await;
+    auth_state(&pool, &server)
+        .with_legacy_owner(None)
+        .await
+        .unwrap();
     cleanup(pool, admin, schema).await;
 }
 
@@ -1403,6 +1412,18 @@ async fn dashboard_decades_group_years_and_filter_the_library() {
 }
 
 async fn database() -> (PgPool, PgPool, String) {
+    database_with_legacy("").await
+}
+
+async fn assert_legacy_tables_removed(pool: &PgPool) {
+    let remaining: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM information_schema.tables WHERE table_schema=current_schema()
+         AND table_name IN ('collection_items','collection_stats_history','settings','user_settings')",
+    ).fetch_one(pool).await.unwrap();
+    assert_eq!(remaining, 0);
+}
+
+async fn database_with_legacy(legacy_sql: &str) -> (PgPool, PgPool, String) {
     let url = std::env::var("TEST_DATABASE_URL")
         .expect("authentication tests require a disposable TEST_DATABASE_URL");
     let admin = PgPoolOptions::new()
@@ -1435,6 +1456,13 @@ async fn database() -> (PgPool, PgPool, String) {
         .connect(&url)
         .await
         .unwrap();
+    if !legacy_sql.is_empty() {
+        sqlx::raw_sql(include_str!("../../db/migrations/0001_init.sql"))
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::raw_sql(legacy_sql).execute(&pool).await.unwrap();
+    }
     waxdemon_db::run_migrations(&pool).await.unwrap();
     (pool, admin, schema)
 }
