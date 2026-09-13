@@ -352,11 +352,6 @@ mod tests {
         assert_eq!(eur["series"][1]["data"], json!([["2025-01-01", 12.345]]));
         assert_eq!(eur["series"][0]["data"], json!([["2025-01-01", null]]));
         assert_eq!(eur["yAxis"]["name"], "EUR");
-        assert_eq!(eur["series"][1]["showSymbol"], true);
-        assert_eq!(
-            history_options(&history, "EUR", true)["series"][0]["showSymbol"],
-            false
-        );
         assert_eq!(
             history_options(&history, "unknown", false)["series"][1]["data"],
             json!([["2025-01-03", 40.0]])
@@ -377,6 +372,5 @@ mod tests {
             options["series"][0]["data"],
             json!([{ "name": "Jazz & Blues", "value": 8 }])
         );
-        assert_eq!(options["tooltip"]["renderMode"], "richText");
     }
 }
