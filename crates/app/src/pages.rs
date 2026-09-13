@@ -350,7 +350,6 @@ fn EstimateLabel(condition: Option<String>) -> impl IntoView {
 
 #[component]
 fn HistoryChart(data: Remote) -> impl IntoView {
-    let chosen = RwSignal::new(None::<String>);
     let currencies = Memo::new(move |_| {
         data.data.get()["history"]
             .as_array()
@@ -360,15 +359,10 @@ fn HistoryChart(data: Remote) -> impl IntoView {
             .collect::<std::collections::BTreeSet<_>>()
     });
     let currency = Signal::derive(move || {
-        chosen
-            .get()
+        data.data.get()["display_currency"]
+            .as_str()
+            .map(str::to_owned)
             .filter(|c| currencies.get().contains(c))
-            .or_else(|| {
-                data.data.get()["display_currency"]
-                    .as_str()
-                    .map(str::to_owned)
-                    .filter(|c| currencies.get().contains(c))
-            })
             .or_else(|| currencies.get().first().cloned())
             .unwrap_or_else(|| "unknown".into())
     });
@@ -384,38 +378,7 @@ fn HistoryChart(data: Remote) -> impl IntoView {
     });
     view! {
         <section class="panel">
-            <div class="section-heading">
-                <h3>"Collection value"</h3>
-                <div class="actions">
-                    <label>
-                        "Currency"
-                        <select
-                            aria-label="Chart currency"
-                            on:change=move |event| chosen.set(Some(event_target_value(&event)))
-                        >
-                            {move || {
-                                currencies
-                                    .get()
-                                    .into_iter()
-                                    .map(|c| {
-                                        let selected = c.clone();
-                                        let label = if c == "unknown" {
-                                            "Unknown currency".into()
-                                        } else {
-                                            c.clone()
-                                        };
-                                        view! {
-                                            <option value=c selected=move || currency.get() == selected>
-                                                {label}
-                                            </option>
-                                        }
-                                    })
-                                    .collect_view()
-                            }}
-                        </select>
-                    </label>
-                </div>
-            </div>
+            <h3>"Collection value"</h3>
             <Chart options label="Collection history with zoom and pan" />
             {move || {
                 currencies
