@@ -38,6 +38,13 @@ depends = ["fmt-check", "clippy", "test", "frontend", "clippy-wasm"]
 description = "Build the server and Rust/WASM browser assets"
 run = ["rustup target add wasm32-unknown-unknown", "cargo leptos build"]
 
+[tasks.dev]
+description = "Run the local app with .env and rebuild on changes"
+env._.file = ".env"
+env.BIND_ADDR = "127.0.0.1:3000"
+env.PUBLIC_URL = "http://127.0.0.1:3000"
+run = ["rustup target add wasm32-unknown-unknown", "cargo leptos watch"]
+
 [tasks.clippy-wasm]
 description = "Lint browser-only Rust code"
 env.CARGO_TARGET_DIR = "target/front"
