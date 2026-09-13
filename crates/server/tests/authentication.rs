@@ -365,7 +365,7 @@ async fn browser_hydration_library_settings_and_chart_lifecycle() {
         .await;
     driver
         .wait(
-            "document.querySelectorAll('tbody tr').length===2 && !document.querySelector('.chart')",
+            "document.querySelectorAll('.record-card').length===2 && !document.querySelector('.chart')",
         )
         .await;
     assert_eq!(driver.script("return testChart.isDisposed()").await, true);
@@ -376,6 +376,11 @@ async fn browser_hydration_library_settings_and_chart_lifecycle() {
         "2020"
     );
     assert_original_styles(&driver).await;
+    driver.snapshot("library-default-grid").await;
+    driver.click(".view-toggle button:first-child").await;
+    driver
+        .wait("document.querySelectorAll('tbody tr').length===2")
+        .await;
     driver.snapshot("library-table").await;
     driver.wait("document.querySelector('tbody').textContent.includes('Mint (M) estimate') && document.querySelector('tbody').textContent.includes('20.25')").await;
     driver.click(".view-toggle button:nth-child(2)").await;
@@ -465,9 +470,9 @@ async fn browser_hydration_library_settings_and_chart_lifecycle() {
         .wait("document.querySelector('header nav a[href=\"/library\"]')")
         .await;
     second.click("header nav a[href='/library']").await;
-    second.wait("document.querySelectorAll('tbody tr').length===1 && document.querySelector('tbody').textContent.includes('Second user private record')").await;
+    second.wait("document.querySelectorAll('.record-card').length===1 && document.querySelector('.record-card').textContent.includes('Second user private record')").await;
     assert_eq!(second.script("return document.body.textContent.includes('First Record') || !!document.querySelector('header nav a[href=\"/admin/users\"]')").await,false);
-    second.click("tbody a").await;
+    second.click(".record-card").await;
     second
         .wait("document.querySelector('h1')?.textContent==='Second user private record'")
         .await;
@@ -475,7 +480,7 @@ async fn browser_hydration_library_settings_and_chart_lifecycle() {
     second.close().await;
     driver.click("header nav a[href='/library']").await;
     driver
-        .wait("document.querySelectorAll('tbody tr').length===2")
+        .wait("document.querySelectorAll('.record-card').length===2")
         .await;
     assert_eq!(
         driver
@@ -489,7 +494,7 @@ async fn browser_hydration_library_settings_and_chart_lifecycle() {
         .await;
     driver.script("const c=echarts.getInstanceByDom(document.querySelector('[data-chart=\"Collection by genre; select a slice to filter the library\"]')); c.trigger('click',{name:'Jazz'});").await;
     driver
-        .wait("location.search==='?genre=Jazz' && document.querySelectorAll('tbody tr').length===1")
+        .wait("location.search==='?genre=Jazz' && document.querySelectorAll('.record-card').length===1")
         .await;
     driver
         .post("/goog/cdp/execute",json!({"cmd":"Emulation.setDeviceMetricsOverride","params":{"width":390,"height":844,"deviceScaleFactor":1,"mobile":true}}))
