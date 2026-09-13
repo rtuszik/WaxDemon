@@ -425,7 +425,7 @@ pub(super) async fn sync_status(
     auth: AuthSession,
 ) -> Result<Json<serde_json::Value>, AuthError> {
     let id = approved(&auth)?.id;
-    let run: Option<serde_json::Value> = sqlx::query_scalar("SELECT jsonb_build_object('id',id,'status',status,'phase',phase,'processed',processed,'total',total,'attempts',attempts,'error',error,'created_at',created_at,'started_at',started_at,'finished_at',finished_at) FROM user_sync_runs WHERE user_id=$1 ORDER BY id DESC LIMIT 1")
+    let run: Option<serde_json::Value> = sqlx::query_scalar("SELECT jsonb_build_object('id',id,'status',status,'phase',phase,'processed',processed,'total',total,'attempts',attempts,'error',error,'warnings',warnings,'created_at',created_at,'started_at',started_at,'finished_at',finished_at) FROM user_sync_runs WHERE user_id=$1 ORDER BY id DESC LIMIT 1")
         .bind(id).fetch_optional(&state.pool).await?;
     Ok(Json(serde_json::json!({"run":run})))
 }

@@ -1123,7 +1123,7 @@ async fn sync_queue_enforces_approval_csrf_deduplication_daily_schedule_and_work
         ("folders", serde_json::json!({"folders":[]})),
         (
             "value",
-            serde_json::json!({"minimum":"€0.00","median":"€0.00","maximum":"€0.00"}),
+            serde_json::json!({"minimum":"$0.00","median":"$0.00","maximum":"$0.00"}),
         ),
     ] {
         Mock::given(path(format!("/users/owner-77/collection/{suffix}")))
@@ -1151,6 +1151,20 @@ async fn sync_queue_enforces_approval_csrf_deduplication_daily_schedule_and_work
     worker.abort();
     let _ = worker.await;
     completed.unwrap();
+    let (status, _, body) = browser.request("GET", "/api/sync/status", "", None).await;
+    assert_eq!(status, StatusCode::OK);
+    let sync_status: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(sync_status["run"]["status"], "completed");
+    assert!(sync_status["run"]["error"].is_null());
+    assert_eq!(sync_status["run"]["warnings"].as_array().unwrap().len(), 1);
+    assert!(
+        sync_status["run"]["warnings"][0]
+            .as_str()
+            .unwrap()
+            .contains("ambiguous")
+    );
+    let (_, _, page) = browser.request("GET", "/", "", None).await;
+    assert!(page.contains("Discogs collection currency is ambiguous"));
     assert_eq!(waxdemon_db::user_sync::enqueue_due(&pool).await.unwrap(), 0);
     sqlx::query("UPDATE user_sync_runs SET finished_at=now()-interval '25 hours' WHERE id=$1")
         .bind(run_id)

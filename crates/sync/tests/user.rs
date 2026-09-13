@@ -182,7 +182,7 @@ fn parses_money_without_guessing_dollar_currency_or_decimal_commas() {
     );
     assert_eq!(parse_money("$12.34").unwrap().1, None);
     assert_eq!(parse_money("CAD 12.34").unwrap().1, Some("CAD".into()));
-    for value in ["€12,34", "€1.234,56", "not money", "-10.00"] {
+    for value in ["€12,34", "€1.234,56", "not money", "-10.00", "XYZ 12.34"] {
         assert!(parse_money(value).is_none(), "{value}");
     }
 }
@@ -238,6 +238,239 @@ async fn isolates_users_preserves_duplicate_copies_and_decimal_currency_and_reus
             .await
             .unwrap();
     assert_eq!(history, vec![("20.02".into(), "EUR".into()); 2]);
+    cleanup(pool, admin, schema).await;
+}
+
+#[tokio::test]
+async fn currency_changes_warn_and_preserve_history_without_affecting_other_users() {
+    let (pool, admin, schema) = database().await;
+    let mut alice = user(&pool, 11, "alice").await;
+    let bob = user(&pool, 22, "bob").await;
+    let server = MockServer::start().await;
+    collection(&server, "alice", vec![entry(100, "Mint (M)")], 1).await;
+    collection(&server, "bob", vec![entry(100, "Mint (M)")], 1).await;
+    Mock::given(path("/marketplace/price_suggestions/42"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "Mint (M)":{"currency":"CAD","value":15}
+        })))
+        .mount(&server)
+        .await;
+    run(&pool, &client(&server, "alice"), &alice).await.unwrap();
+    run(&pool, &client(&server, "bob"), &bob).await.unwrap();
+    let initial: Vec<String> =
+        sqlx::query_scalar("SELECT warnings FROM user_sync_runs WHERE id=$1")
+            .bind(alice.run_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(initial.is_empty());
+    sqlx::query("UPDATE user_sync_runs SET status='completed' WHERE id=$1")
+        .bind(alice.run_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    alice.run_id = sqlx::query_scalar(
+        "INSERT INTO user_sync_runs(user_id,status) VALUES ($1,'running') RETURNING id",
+    )
+    .bind(alice.user_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    sqlx::query("UPDATE user_price_cache SET fetched_at=now()-interval '2 days' WHERE user_id=$1")
+        .bind(alice.user_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    Mock::given(path("/users/alice/collection/value"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "minimum":"USD 10", "median":"USD 20", "maximum":"USD 30"
+        })))
+        .with_priority(1)
+        .mount(&server)
+        .await;
+    Mock::given(path("/marketplace/price_suggestions/42"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "Mint (M)":{"currency":"USD","value":25}
+        })))
+        .with_priority(1)
+        .mount(&server)
+        .await;
+    run(&pool, &client(&server, "alice"), &alice).await.unwrap();
+    let history: Vec<(String, String)> = sqlx::query_as("SELECT value_median::text,currency FROM user_collection_history WHERE user_id=$1 ORDER BY timestamp::timestamptz")
+        .bind(alice.user_id).fetch_all(&pool).await.unwrap();
+    assert_eq!(
+        history,
+        vec![("20.02".into(), "EUR".into()), ("20".into(), "USD".into())]
+    );
+    let warnings: Vec<String> =
+        sqlx::query_scalar("SELECT warnings FROM user_sync_runs WHERE id=$1")
+            .bind(alice.run_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(warnings.len(), 2);
+    assert!(warnings.iter().any(|w| w.contains("EUR to USD")));
+    assert!(warnings.iter().any(|w| w.contains("price currency")));
+    run(&pool, &client(&server, "alice"), &alice).await.unwrap();
+    let repeated: Vec<String> =
+        sqlx::query_scalar("SELECT warnings FROM user_sync_runs WHERE id=$1")
+            .bind(alice.run_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(repeated, warnings);
+    let bob_warnings: Vec<String> =
+        sqlx::query_scalar("SELECT warnings FROM user_sync_runs WHERE id=$1")
+            .bind(bob.run_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(bob_warnings.is_empty());
+    let prices: Vec<(i64, String, String)> = sqlx::query_as(
+        "SELECT user_id,amount::text,currency FROM user_price_suggestions ORDER BY user_id",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        prices,
+        vec![
+            (alice.user_id, "25".into(), "USD".into()),
+            (bob.user_id, "15".into(), "CAD".into())
+        ]
+    );
+    cleanup(pool, admin, schema).await;
+}
+
+#[tokio::test]
+async fn mixed_collection_currencies_are_not_saved_as_unknown_values() {
+    let (pool, admin, schema) = database().await;
+    let alice = user(&pool, 11, "alice").await;
+    let server = MockServer::start().await;
+    collection(&server, "alice", vec![], 0).await;
+    Mock::given(path("/users/alice/collection/value"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "minimum":"€10", "median":"USD 20", "maximum":"€30"
+        })))
+        .with_priority(1)
+        .mount(&server)
+        .await;
+    run(&pool, &client(&server, "alice"), &alice).await.unwrap();
+    let valued: i64 = sqlx::query_scalar("SELECT count(*) FROM user_collection_history WHERE value_min IS NOT NULL OR value_median IS NOT NULL OR value_max IS NOT NULL")
+        .fetch_one(&pool).await.unwrap();
+    assert_eq!(valued, 0);
+    let warnings: Vec<String> =
+        sqlx::query_scalar("SELECT warnings FROM user_sync_runs WHERE id=$1")
+            .bind(alice.run_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(
+        warnings
+            .iter()
+            .any(|w| w.contains("conflicting currencies"))
+    );
+    cleanup(pool, admin, schema).await;
+}
+
+#[tokio::test]
+async fn ambiguous_totals_keep_unknown_currency_and_warn_without_using_price_currency() {
+    let (pool, admin, schema) = database().await;
+    let alice = user(&pool, 11, "alice").await;
+    let server = MockServer::start().await;
+    collection(&server, "alice", vec![entry(100, "Mint (M)")], 1).await;
+    Mock::given(path("/users/alice/collection/value"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "minimum":"$10", "median":"$20", "maximum":"$30"
+        })))
+        .with_priority(1)
+        .mount(&server)
+        .await;
+    Mock::given(path("/marketplace/price_suggestions/42"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "Mint (M)":{"currency":"CAD","value":15}
+        })))
+        .mount(&server)
+        .await;
+    run(&pool, &client(&server, "alice"), &alice).await.unwrap();
+    let history: (String, Option<String>) = sqlx::query_as(
+        "SELECT value_median::text,currency FROM user_collection_history WHERE user_id=$1",
+    )
+    .bind(alice.user_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(history, ("20".into(), None));
+    let warnings: Vec<String> =
+        sqlx::query_scalar("SELECT warnings FROM user_sync_runs WHERE id=$1")
+            .bind(alice.run_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(warnings.iter().any(|w| w.contains("ambiguous")));
+    cleanup(pool, admin, schema).await;
+}
+
+#[tokio::test]
+async fn invalid_price_currencies_preserve_cached_values_and_warn() {
+    let (pool, admin, schema) = database().await;
+    let alice = user(&pool, 11, "alice").await;
+    let server = MockServer::start().await;
+    collection(&server, "alice", vec![entry(100, "Mint (M)")], 1).await;
+    Mock::given(path("/marketplace/price_suggestions/42"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "Mint (M)":{"currency":"EUR","value":15}
+        })))
+        .mount(&server)
+        .await;
+    run(&pool, &client(&server, "alice"), &alice).await.unwrap();
+    for currency in ["USD", "XYZ"] {
+        sqlx::query("UPDATE user_price_cache SET fetched_at=now()-interval '2 days'")
+            .execute(&pool)
+            .await
+            .unwrap();
+        Mock::given(path("/marketplace/price_suggestions/42"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "Mint (M)":{"currency":"EUR","value":100},
+                "Very Good (VG)":{"currency":currency,"value":50}
+            })))
+            .with_priority(1)
+            .up_to_n_times(1)
+            .mount(&server)
+            .await;
+        run(&pool, &client(&server, "alice"), &alice).await.unwrap();
+        let item: (String, String) = sqlx::query_as(
+            "SELECT suggested_value::text,currency FROM user_collection_items WHERE user_id=$1",
+        )
+        .bind(alice.user_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(item, ("15".into(), "EUR".into()));
+        let cached: Vec<(String, String)> = sqlx::query_as(
+            "SELECT amount::text,currency FROM user_price_suggestions WHERE user_id=$1",
+        )
+        .bind(alice.user_id)
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(cached, vec![("15".into(), "EUR".into())]);
+        let warnings: Vec<String> =
+            sqlx::query_scalar("SELECT warnings FROM user_sync_runs WHERE id=$1")
+                .bind(alice.run_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert!(!warnings.is_empty());
+        let fresh: bool = sqlx::query_scalar(
+            "SELECT fetched_at>now()-interval '1 day' FROM user_price_cache WHERE user_id=$1",
+        )
+        .bind(alice.user_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert!(!fresh);
+    }
     cleanup(pool, admin, schema).await;
 }
 
