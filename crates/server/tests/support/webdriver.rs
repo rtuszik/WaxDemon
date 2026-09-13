@@ -56,6 +56,22 @@ impl Driver {
         response["value"].as_str().unwrap().to_string()
     }
 
+    pub async fn wait_for_url(&self, expected: &str) {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+        loop {
+            let actual = self.current_url().await;
+            if actual == expected {
+                return;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "Browser redirect timed out: expected {expected}, got {actual}; logs: {}",
+                self.post("/log", json!({"type":"browser"})).await
+            );
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+    }
+
     pub async fn script(&self, script: &str) -> Value {
         self.post("/execute/sync", json!({"script":script,"args":[]}))
             .await
