@@ -46,6 +46,9 @@ pub fn parse_money(value: &str) -> Option<(Decimal, Option<String>)> {
     } else if let Some(v) = value.strip_prefix('$') {
         (v, None)
     } else if value.len() >= 3 && value.as_bytes()[..3].iter().all(u8::is_ascii_uppercase) {
+        if !supported_currency(&value[..3]) {
+            return None;
+        }
         (&value[3..], Some(value[..3].into()))
     } else {
         (value, None)
@@ -66,6 +69,30 @@ pub fn parse_money(value: &str) -> Option<(Decimal, Option<String>)> {
     }
     let amount: Decimal = number.replace(',', "").parse().ok()?;
     (amount >= Decimal::ZERO).then_some((amount, currency))
+}
+
+fn supported_currency(currency: &str) -> bool {
+    matches!(
+        currency,
+        "USD"
+            | "GBP"
+            | "EUR"
+            | "CAD"
+            | "AUD"
+            | "JPY"
+            | "CHF"
+            | "MXN"
+            | "BRL"
+            | "NZD"
+            | "SEK"
+            | "ZAR"
+    )
+}
+
+async fn warn(connection: &mut PgConnection, sync: &UserSync, message: &str) -> anyhow::Result<()> {
+    sqlx::query("UPDATE user_sync_runs SET warnings=array_append(warnings,$3) WHERE id=$1 AND user_id=$2 AND NOT ($3=ANY(warnings))")
+        .bind(sync.run_id).bind(sync.user_id).bind(message).execute(connection).await?;
+    Ok(())
 }
 
 fn endpoint(username: &str, suffix: &str) -> String {
@@ -237,7 +264,7 @@ pub async fn run_locked(
     .await?;
     sqlx::query("INSERT INTO user_collection_metadata (user_id, fields, folders) VALUES ($1,$2,$3) ON CONFLICT (user_id) DO UPDATE SET fields=EXCLUDED.fields, folders=EXCLUDED.folders, updated_at=now()")
         .bind(sync.user_id).bind(fields).bind(folders).execute(&mut *tx).await?;
-    let values: Vec<_> = ["minimum", "median", "maximum"]
+    let mut values: Vec<_> = ["minimum", "median", "maximum"]
         .map(|key| {
             overall
                 .as_ref()
@@ -245,15 +272,47 @@ pub async fn run_locked(
                 .and_then(parse_money)
         })
         .into();
-    let currency = values[0].as_ref().and_then(|v| v.1.clone()).filter(|c| {
-        values
-            .iter()
-            .all(|v| v.as_ref().and_then(|v| v.1.as_ref()) == Some(c))
-    });
+    let currencies: BTreeSet<_> = values.iter().flatten().map(|v| v.1.clone()).collect();
+    if currencies.len() > 1 {
+        warn(&mut tx, sync, "Discogs returned conflicting currencies in collection totals; valuation amounts were not saved.").await?;
+        values.fill(None);
+    } else if overall.is_some() && values.iter().any(Option::is_none) {
+        warn(
+            &mut tx,
+            sync,
+            "Discogs returned invalid collection totals; valuation amounts were not saved.",
+        )
+        .await?;
+        values.fill(None);
+    }
+    let currency = values.iter().flatten().find_map(|v| v.1.clone());
+    if values.iter().any(Option::is_some) && currency.is_none() {
+        warn(
+            &mut tx,
+            sync,
+            "Discogs collection currency is ambiguous; amounts were saved with unknown currency.",
+        )
+        .await?;
+    }
+    if let Some(currency) = currency.as_deref() {
+        let previous: Option<String> = sqlx::query_scalar("SELECT currency FROM user_collection_history WHERE user_id=$1 AND currency IS NOT NULL AND (value_min IS NOT NULL OR value_median IS NOT NULL OR value_max IS NOT NULL) ORDER BY timestamp::timestamptz DESC,timestamp DESC LIMIT 1")
+            .bind(sync.user_id).fetch_optional(&mut *tx).await?;
+        if let Some(previous) = previous.filter(|previous| previous != currency) {
+            warn(&mut tx, sync, &format!("Discogs collection currency changed from {previous} to {currency}; historical amounts retain their original currency.")).await?;
+        }
+    }
     sqlx::query("INSERT INTO user_collection_history (user_id, timestamp, total_items, value_min, value_median, value_max, currency, raw_values) SELECT $1, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"'), $3, $4::text::numeric, $5::text::numeric, $6::text::numeric, $7, $8 FROM user_sync_runs WHERE id=$2 AND user_id=$1 ON CONFLICT (user_id,timestamp) DO UPDATE SET total_items=EXCLUDED.total_items, value_min=EXCLUDED.value_min, value_median=EXCLUDED.value_median, value_max=EXCLUDED.value_max, currency=EXCLUDED.currency, raw_values=EXCLUDED.raw_values")
         .bind(sync.user_id).bind(sync.run_id).bind(i32::try_from(entries.len())?)
         .bind(values[0].as_ref().map(|v| v.0.to_string())).bind(values[1].as_ref().map(|v| v.0.to_string())).bind(values[2].as_ref().map(|v| v.0.to_string())).bind(currency).bind(overall).execute(&mut *tx).await?;
     tx.commit().await?;
+    let mut price_currencies: BTreeSet<String> = sqlx::query_scalar::<_, String>(
+        "SELECT DISTINCT currency FROM user_price_suggestions WHERE user_id=$1",
+    )
+    .bind(sync.user_id)
+    .fetch_all(&mut *connection)
+    .await?
+    .into_iter()
+    .collect();
     let releases: BTreeSet<i64> = entries.iter().map(|e| e.release.id).collect();
     for (index, release) in releases.iter().enumerate() {
         progress(connection, sync, "prices", index, releases.len()).await?;
@@ -272,13 +331,34 @@ pub async fn run_locked(
             };
             if let Some(suggestions) = suggestions {
                 ensure!(
-                    suggestions.values().all(|v| v.currency.len() == 3
-                        && v.currency.bytes().all(|c| c.is_ascii_uppercase())
-                        && v.value >= Decimal::ZERO),
+                    suggestions.values().all(|v| v.value >= Decimal::ZERO),
                     "invalid price suggestion"
                 );
                 let mut tx = connection.begin().await?;
                 lock_authorization(&mut tx, sync).await?;
+                if suggestions
+                    .values()
+                    .any(|v| !supported_currency(&v.currency))
+                    || suggestions
+                        .values()
+                        .map(|v| &v.currency)
+                        .collect::<BTreeSet<_>>()
+                        .len()
+                        > 1
+                {
+                    warn(&mut tx, sync, "Discogs returned invalid or conflicting price currencies; affected prices were not updated.").await?;
+                    tx.commit().await?;
+                    continue;
+                }
+                if let Some(price) = suggestions.values().next() {
+                    if price_currencies
+                        .iter()
+                        .any(|currency| currency != &price.currency)
+                    {
+                        warn(&mut tx, sync, "Discogs price currency differs from other saved prices; each amount retains the currency returned by Discogs.").await?;
+                    }
+                    price_currencies.insert(price.currency.clone());
+                }
                 sqlx::query(
                     "DELETE FROM user_price_suggestions WHERE user_id=$1 AND release_id=$2",
                 )
