@@ -2,6 +2,13 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.4.0](https://github.com/rtuszik/WaxDemon/compare/6c720d0e48839e50251d2de26bbcb8458fbf7a7f..v1.4.0) - 2026-09-13
+#### Features
+- (**auth**) group collection formats into normalized categories - ([32d9b60](https://github.com/rtuszik/WaxDemon/commit/32d9b60d939ed1dd8fb4a066b71bd2fddb26cc79)) - [@rtuszik](https://github.com/rtuszik)
+- (**library**) enable grid view by default - ([6c720d0](https://github.com/rtuszik/WaxDemon/commit/6c720d0e48839e50251d2de26bbcb8458fbf7a7f)) - [@rtuszik](https://github.com/rtuszik)
+
+- - -
+
 ## [v1.3.0](https://github.com/rtuszik/WaxDemon/compare/40528a62aafee787fc2ba839cc6cf96a5f37cd54..v1.3.0) - 2026-09-13
 #### Features
 - (**db**) clean up legacy tables after import and migration - ([f6953c2](https://github.com/rtuszik/WaxDemon/commit/f6953c23f0a7edffaf077aec447192dd49f8aa0b)) - [@rtuszik](https://github.com/rtuszik)
