@@ -356,6 +356,9 @@ small {
     border-radius: 4px;
     object-fit: cover;
 }
+.ranked-record .amount {
+    text-align: right;
+}
 .record-name {
     flex: 1;
     min-width: 0;
