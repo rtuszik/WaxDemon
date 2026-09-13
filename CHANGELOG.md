@@ -2,6 +2,16 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.4.1](https://github.com/rtuszik/WaxDemon/compare/3a1cd8010c1b4154e0ece33ba5787ba6a0adb3c1..v1.4.1) - 2026-09-13
+#### Bug Fixes
+- (**hooks**) limit source checks to pre-commit - ([3a1cd80](https://github.com/rtuszik/WaxDemon/commit/3a1cd8010c1b4154e0ece33ba5787ba6a0adb3c1)) - [@rtuszik](https://github.com/rtuszik)
+#### Tests
+- simplify assertions and await redirects - ([d6eff85](https://github.com/rtuszik/WaxDemon/commit/d6eff85f2212170801ea3af8419751ca0ea479c0)) - [@rtuszik](https://github.com/rtuszik)
+#### Style
+- remove uppercase text transformations - ([8b4d3a0](https://github.com/rtuszik/WaxDemon/commit/8b4d3a0a5e03d99b11c3ab233d413ae98cec1b92)) - [@rtuszik](https://github.com/rtuszik)
+
+- - -
+
 ## [v1.4.0](https://github.com/rtuszik/WaxDemon/compare/6c720d0e48839e50251d2de26bbcb8458fbf7a7f..v1.4.0) - 2026-09-13
 #### Features
 - (**auth**) group collection formats into normalized categories - ([32d9b60](https://github.com/rtuszik/WaxDemon/commit/32d9b60d939ed1dd8fb4a066b71bd2fddb26cc79)) - [@rtuszik](https://github.com/rtuszik)
