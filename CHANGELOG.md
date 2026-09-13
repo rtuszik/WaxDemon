@@ -2,6 +2,18 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.3.0](https://github.com/rtuszik/WaxDemon/compare/40528a62aafee787fc2ba839cc6cf96a5f37cd54..v1.3.0) - 2026-09-13
+#### Features
+- (**db**) clean up legacy tables after import and migration - ([f6953c2](https://github.com/rtuszik/WaxDemon/commit/f6953c23f0a7edffaf077aec447192dd49f8aa0b)) - [@rtuszik](https://github.com/rtuszik)
+- (**library**) add decade filtering and simplify dashboard history - ([a538afe](https://github.com/rtuszik/WaxDemon/commit/a538afeda4490ee58ff00b379e694b370db7937c)) - [@rtuszik](https://github.com/rtuszik)
+#### Documentation
+- clarify documentation change guidelines - ([80ae281](https://github.com/rtuszik/WaxDemon/commit/80ae2810ba268223cae93bc914e097149a7dd49c)) - [@rtuszik](https://github.com/rtuszik)
+#### Style
+- Align ranked record amounts to the right - ([c7c6228](https://github.com/rtuszik/WaxDemon/commit/c7c62287dcbe7492343fb250a42d9caf75c276f5)) - [@rtuszik](https://github.com/rtuszik)
+- format chart configuration and Rust analyzer settings - ([40528a6](https://github.com/rtuszik/WaxDemon/commit/40528a62aafee787fc2ba839cc6cf96a5f37cd54)) - [@rtuszik](https://github.com/rtuszik)
+
+- - -
+
 ## [v1.2.0](https://github.com/rtuszik/WaxDemon/compare/2a48b16790e536b39dbcc8d44747831e918579f6..v1.2.0) - 2026-09-13
 #### Features
 - (**sync**) add currency validation and sync warnings - ([ed8b687](https://github.com/rtuszik/WaxDemon/commit/ed8b687e059b930f5be8b3592c76fdbb6f3ef77c)) - [@rtuszik](https://github.com/rtuszik)
