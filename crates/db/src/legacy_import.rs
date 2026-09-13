@@ -15,6 +15,21 @@ pub struct ImportReport {
     pub setting_count: i64,
 }
 
+pub async fn has_legacy_data(pool: &Db) -> Result<bool, DbError> {
+    let exists: bool = sqlx::query_scalar("SELECT to_regclass('collection_items') IS NOT NULL")
+        .fetch_one(pool)
+        .await?;
+    if !exists {
+        return Ok(false);
+    }
+    Ok(sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM collection_items UNION ALL
+         SELECT 1 FROM collection_stats_history UNION ALL SELECT 1 FROM settings)",
+    )
+    .fetch_one(pool)
+    .await?)
+}
+
 pub async fn import_legacy(
     pool: &Db,
     discogs_id: i64,
@@ -56,14 +71,10 @@ async fn import_legacy_in_transaction(
         .await?;
     sqlx::query(
         "LOCK TABLE legacy_import, users, releases, user_collection_items,
-         user_collection_history, user_settings IN EXCLUSIVE MODE",
+         user_collection_history IN EXCLUSIVE MODE",
     )
     .execute(&mut *tx)
     .await?;
-    sqlx::query("LOCK TABLE collection_items, collection_stats_history, settings IN SHARE MODE")
-        .execute(&mut *tx)
-        .await?;
-
     let imported: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM legacy_import)")
         .fetch_one(&mut *tx)
         .await?;
@@ -85,6 +96,61 @@ async fn import_legacy_in_transaction(
         ));
     }
 
+    let user_id: i64 = sqlx::query_scalar(
+        "INSERT INTO users (discogs_id, username, role, status)
+         VALUES ($1, $2, 'admin', 'approved')
+         ON CONFLICT (discogs_id) DO UPDATE SET username = EXCLUDED.username, role = 'admin', status = 'approved'
+         RETURNING id",
+    )
+    .bind(discogs_id)
+    .bind(username)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    let legacy: bool = sqlx::query_scalar("SELECT to_regclass('collection_items') IS NOT NULL")
+        .fetch_one(&mut *tx)
+        .await?;
+    let (item_count, release_count, history_count, setting_count) = if legacy {
+        copy_legacy(tx, user_id).await?
+    } else {
+        (0, 0, 0, 0)
+    };
+
+    sqlx::query(
+        "INSERT INTO legacy_import (user_id, item_count, release_count, history_count, setting_count)
+         VALUES ($1, $2, $3, $4, $5)",
+    )
+    .bind(user_id)
+    .bind(item_count)
+    .bind(release_count)
+    .bind(history_count)
+    .bind(setting_count)
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(
+        "DROP TABLE IF EXISTS collection_items, collection_stats_history, settings, user_settings",
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    Ok(ImportReport {
+        user_id,
+        item_count,
+        release_count,
+        history_count,
+        setting_count,
+    })
+}
+
+async fn copy_legacy(
+    tx: &mut sqlx::PgConnection,
+    user_id: i64,
+) -> Result<(i64, i64, i64, i64), DbError> {
+    sqlx::query(
+        "LOCK TABLE collection_items, collection_stats_history, settings IN ACCESS EXCLUSIVE MODE",
+    )
+    .execute(&mut *tx)
+    .await?;
     let invalid_money: bool = sqlx::query_scalar(
         "SELECT EXISTS (
            SELECT 1 FROM collection_items WHERE suggested_value::text IN ('NaN', 'Infinity', '-Infinity')
@@ -103,17 +169,6 @@ async fn import_legacy_in_transaction(
                 .into(),
         ));
     }
-
-    let user_id: i64 = sqlx::query_scalar(
-        "INSERT INTO users (discogs_id, username, role, status)
-         VALUES ($1, $2, 'admin', 'approved')
-         ON CONFLICT (discogs_id) DO UPDATE SET username = EXCLUDED.username, role = 'admin', status = 'approved'
-         RETURNING id",
-    )
-    .bind(discogs_id)
-    .bind(username)
-    .fetch_one(&mut *tx)
-    .await?;
 
     let release_count = sqlx::query(
         "INSERT INTO releases (id, artist, title, year, format, genres, styles, cover_image_url)
@@ -151,18 +206,6 @@ async fn import_legacy_in_transaction(
     .await?
     .rows_affected() as i64;
 
-    let setting_count = sqlx::query(
-        "INSERT INTO user_settings (user_id, key, value)
-         SELECT $1, key, value FROM settings",
-    )
-    .bind(user_id)
-    .execute(&mut *tx)
-    .await?
-    .rows_affected() as i64;
-
-    sqlx::query("UPDATE user_settings SET value = 'idle' WHERE user_id = $1 AND key = 'sync_status' AND value = 'running'")
-        .bind(user_id).execute(&mut *tx).await?;
-
     let expected: (i64, i64, i64, i64) = sqlx::query_as(
         "SELECT (SELECT count(*) FROM collection_items),
                 (SELECT count(DISTINCT release_id) FROM collection_items),
@@ -171,29 +214,41 @@ async fn import_legacy_in_transaction(
     )
     .fetch_one(&mut *tx)
     .await?;
-    if expected != (item_count, release_count, history_count, setting_count) {
+    if (expected.0, expected.1, expected.2) != (item_count, release_count, history_count) {
         return Err(DbError::Config(
             "legacy import count verification failed".into(),
         ));
     }
 
-    sqlx::query(
-        "INSERT INTO legacy_import (user_id, item_count, release_count, history_count, setting_count)
-         VALUES ($1, $2, $3, $4, $5)",
-    )
-    .bind(user_id)
-    .bind(item_count)
-    .bind(release_count)
-    .bind(history_count)
-    .bind(setting_count)
-    .execute(&mut *tx)
-    .await?;
+    let different: bool = sqlx::query_scalar(
+        "SELECT EXISTS (
+            SELECT id::bigint, release_id::bigint, added_date, folder_id::bigint,
+                   rating, notes, condition, suggested_value::text::numeric, last_value_check, NULL::text
+            FROM collection_items
+            EXCEPT ALL
+            SELECT instance_id, release_id, added_date, folder_id,
+                   rating, notes, condition, suggested_value, last_value_check, currency
+            FROM user_collection_items WHERE user_id=$1
+        ) OR EXISTS (
+            SELECT timestamp,total_items,value_min::text::numeric,value_mean::text::numeric,value_max::text::numeric,NULL::text
+            FROM collection_stats_history
+            EXCEPT ALL
+            SELECT timestamp,total_items,value_min,value_median,value_max,currency
+            FROM user_collection_history WHERE user_id=$1
+        ) OR EXISTS (
+            SELECT * FROM (
+                SELECT DISTINCT ON (release_id) release_id::bigint,artist,title,year,format,genres,styles,cover_image_url
+                FROM collection_items ORDER BY release_id,last_value_check DESC NULLS LAST,id DESC
+            ) source
+            EXCEPT ALL
+            SELECT id,artist,title,year,format,genres,styles,cover_image_url FROM releases
+        )",
+    ).bind(user_id).fetch_one(&mut *tx).await?;
+    if different {
+        return Err(DbError::Config(
+            "legacy import data verification failed".into(),
+        ));
+    }
 
-    Ok(ImportReport {
-        user_id,
-        item_count,
-        release_count,
-        history_count,
-        setting_count,
-    })
+    Ok((item_count, release_count, history_count, expected.3))
 }

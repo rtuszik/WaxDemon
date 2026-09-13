@@ -77,11 +77,9 @@ impl AuthState {
     }
 
     pub async fn with_legacy_owner(mut self, username: Option<String>) -> anyhow::Result<Self> {
-        let (imported, admin, legacy_data): (bool, bool, bool) = sqlx::query_as(
+        let (imported, admin): (bool, bool) = sqlx::query_as(
             "SELECT EXISTS(SELECT 1 FROM legacy_import),
-                    EXISTS(SELECT 1 FROM users WHERE role = 'admin' AND status = 'approved'),
-                    EXISTS(SELECT 1 FROM collection_items UNION ALL
-                           SELECT 1 FROM collection_stats_history UNION ALL SELECT 1 FROM settings)",
+                    EXISTS(SELECT 1 FROM users WHERE role = 'admin' AND status = 'approved')",
         )
         .fetch_one(&self.pool)
         .await?;
@@ -91,7 +89,7 @@ impl AuthState {
                 "an approved administrator is required; completed imports will not be repeated"
             );
             anyhow::ensure!(
-                imported || !legacy_data,
+                imported || !waxdemon_db::legacy_import::has_legacy_data(&self.pool).await?,
                 "unimported legacy data exists alongside an administrator; refusing to reassign it"
             );
         } else {
