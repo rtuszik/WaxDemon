@@ -1,2 +1,5 @@
 [rustfmt]
 overrideCommand = ["leptosfmt", "--stdin", "--rustfmt"]
+
+[diagnostics]
+disabled = ["inactive_code"]
