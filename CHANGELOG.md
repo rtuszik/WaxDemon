@@ -2,6 +2,20 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.2.0](https://github.com/rtuszik/WaxDemon/compare/2a48b16790e536b39dbcc8d44747831e918579f6..v1.2.0) - 2026-09-13
+#### Features
+- (**sync**) add currency validation and sync warnings - ([ed8b687](https://github.com/rtuszik/WaxDemon/commit/ed8b687e059b930f5be8b3592c76fdbb6f3ef77c)) - [@rtuszik](https://github.com/rtuszik)
+#### Bug Fixes
+- (**auth**) show only latest valued dashboard snapshot - ([34359cd](https://github.com/rtuszik/WaxDemon/commit/34359cd235aed22dedb2b961fde11b0c10454431)) - [@rtuszik](https://github.com/rtuszik)
+- (**sync**) retain cached prices on invalid currency responses - ([3156c50](https://github.com/rtuszik/WaxDemon/commit/3156c50e75290f22db057262bed16c2094a2b57e)) - [@rtuszik](https://github.com/rtuszik)
+#### Continuous Integration
+- streamline release and Rust workflows - ([02289fc](https://github.com/rtuszik/WaxDemon/commit/02289fc3b05b8b9fffb4c1a0b07cff63439aad57)) - [@rtuszik](https://github.com/rtuszik)
+- add workflow for commit validation - ([2a48b16](https://github.com/rtuszik/WaxDemon/commit/2a48b16790e536b39dbcc8d44747831e918579f6)) - [@rtuszik](https://github.com/rtuszik)
+#### Style
+- format Leptos views with leptosfmt - ([5f161b0](https://github.com/rtuszik/WaxDemon/commit/5f161b0fb3d2035b4337e830465b66414d61a9ae)) - [@rtuszik](https://github.com/rtuszik)
+
+- - -
+
 ## [v1.1.0](https://github.com/rtuszik/WaxDemon/compare/9b5264b0b1bb1ec5a7794385363672002405ff13..v1.1.0) - 2026-09-12
 #### Features
 - (**dashboard**) paginate history and compress API responses - ([690e439](https://github.com/rtuszik/WaxDemon/commit/690e439d8a0e3c70e01a7130212108c95c42cb9e)) - [@rtuszik](https://github.com/rtuszik)
