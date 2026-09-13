@@ -233,7 +233,7 @@ pub(super) async fn dashboard(
             .fetch_optional(&state.pool)
             .await?
             .flatten();
-    let summaries: Vec<Value> = sqlx::query_scalar("SELECT to_jsonb(s) FROM (SELECT DISTINCT ON (currency) currency,timestamp,total_items,value_min::text AS minimum,value_median::text AS median,value_max::text AS maximum,(value_median/NULLIF(total_items,0))::text AS average FROM user_collection_history WHERE user_id=$1 ORDER BY currency,timestamp::timestamptz DESC) s")
+    let summaries: Vec<Value> = sqlx::query_scalar("SELECT to_jsonb(s) FROM (SELECT currency,timestamp,total_items,value_min::text AS minimum,value_median::text AS median,value_max::text AS maximum,(value_median/NULLIF(total_items,0))::text AS average FROM user_collection_history WHERE user_id=$1 AND (value_min IS NOT NULL OR value_median IS NOT NULL OR value_max IS NOT NULL) ORDER BY timestamp::timestamptz DESC,timestamp DESC LIMIT 1) s")
         .bind(user).fetch_all(&state.pool).await?;
     let years: Vec<Value> = sqlx::query_scalar("SELECT jsonb_build_object('name',CASE WHEN r.year>0 THEN r.year::text ELSE 'Unknown' END,'count',count(*)) FROM user_collection_items i JOIN releases r ON r.id=i.release_id WHERE i.user_id=$1 GROUP BY CASE WHEN r.year>0 THEN r.year::text ELSE 'Unknown' END ORDER BY count(*) DESC,CASE WHEN r.year>0 THEN r.year::text ELSE 'Unknown' END")
         .bind(user).fetch_all(&state.pool).await?;
