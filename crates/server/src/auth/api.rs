@@ -224,9 +224,8 @@ pub(super) async fn dashboard(
     ) SELECT jsonb_build_object('timestamp',timestamp,'total_items',total_items,'minimum',value_min::text,'median',value_median::text,'maximum',value_max::text,'currency',currency)
     FROM ranked WHERE rn=n OR (rn-1)%GREATEST(1,ceil(n/998.0)::bigint)=0 ORDER BY timestamp::timestamptz,timestamp")
         .bind(user).bind(days).fetch_all(&state.pool).await?;
-    let format_counts: Vec<(Option<String>, i64)> = sqlx::query_as("SELECT r.format,count(*) FROM user_collection_items i JOIN releases r ON r.id=i.release_id WHERE i.user_id=$1 GROUP BY r.format")
+    let formats:Vec<Value>=sqlx::query_scalar("SELECT jsonb_build_object('name',COALESCE(r.format,'Unknown'),'count',count(*)) FROM user_collection_items i JOIN releases r ON r.id=i.release_id WHERE i.user_id=$1 GROUP BY r.format ORDER BY count(*) DESC")
         .bind(user).fetch_all(&state.pool).await?;
-    let formats = group_formats(format_counts);
     let genres:Vec<Value>=sqlx::query_scalar("SELECT jsonb_build_object('name',genre,'count',count(*)) FROM user_collection_items i JOIN releases r ON r.id=i.release_id CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(NULLIF(r.genres,'')::jsonb,'[]'::jsonb)) genre WHERE i.user_id=$1 GROUP BY genre ORDER BY count(*) DESC")
         .bind(user).fetch_all(&state.pool).await?;
     let display_currency: Option<String> =
@@ -321,128 +320,4 @@ async fn save_settings(
         .bind(user).bind(input.sync_interval_hours).bind(input.price_refresh_hours).bind(currency).execute(&mut *tx).await?;
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
-}
-
-fn format_category(format: Option<&str>) -> String {
-    let mut categories = std::collections::BTreeSet::new();
-    for part in format.unwrap_or_default().split(';') {
-        let part = part.trim();
-        let part = part
-            .split_once(" x ")
-            .filter(|(quantity, _)| quantity.parse::<u32>().is_ok())
-            .map_or(part, |(_, rest)| rest);
-        let (medium, descriptions) = part.split_once('(').unwrap_or((part, ""));
-        let medium = medium.trim();
-        if medium.is_empty() || matches!(medium, "All Media" | "Box Set") {
-            continue;
-        }
-        let descriptions: Vec<_> = descriptions
-            .trim_end_matches(')')
-            .split(',')
-            .map(str::trim)
-            .collect();
-        let category = if medium == "Vinyl" {
-            if descriptions.contains(&"LP") {
-                "LP"
-            } else if descriptions.contains(&"7\"") {
-                "7″"
-            } else if descriptions.contains(&"10\"") {
-                "10″"
-            } else if descriptions.contains(&"12\"") {
-                "12″"
-            } else {
-                "Vinyl"
-            }
-        } else {
-            medium
-        };
-        categories.insert(category);
-    }
-    match categories.len() {
-        0 => "Unknown".into(),
-        1 => categories.into_iter().next().unwrap().into(),
-        _ => "Mixed formats".into(),
-    }
-}
-
-fn group_formats(formats: Vec<(Option<String>, i64)>) -> Vec<Value> {
-    let mut counts = std::collections::BTreeMap::<String, i64>::new();
-    for (format, count) in formats {
-        *counts
-            .entry(format_category(format.as_deref()))
-            .or_default() += count;
-    }
-    let mut counts: Vec<_> = counts.into_iter().collect();
-    counts.sort_by(|(a_name, a_count), (b_name, b_count)| {
-        b_count.cmp(a_count).then_with(|| a_name.cmp(b_name))
-    });
-    counts
-        .into_iter()
-        .map(|(name, count)| json!({"name": name, "count": count}))
-        .collect()
-}
-
-#[cfg(test)]
-mod format_tests {
-    use super::*;
-
-    #[test]
-    fn physical_formats_ignore_quantity_and_release_descriptions() {
-        for (format, expected) in [
-            ("1 x Vinyl (LP, Album, Stereo)", "LP"),
-            ("2 x Vinyl (LP, Album, Reissue, Stereo)", "LP"),
-            ("1 x Vinyl (12\", LP, Album)", "LP"),
-            ("1 x Vinyl (7\", Single, 45 RPM)", "7″"),
-            ("1 x Vinyl (10\", EP)", "10″"),
-            ("2 x Vinyl (12\", 45 RPM, Album)", "12″"),
-            ("1 x CD (Album, Reissue)", "CD"),
-            ("1 x Cassette (Album)", "Cassette"),
-            ("Vinyl", "Vinyl"),
-            ("CD", "CD"),
-            ("", "Unknown"),
-            ("1 x Box Set (Special Edition)", "Unknown"),
-            ("1 x Box Set (Special Edition); 2 x Vinyl (LP)", "LP"),
-            (
-                "1 x Vinyl (LP); 1 x Vinyl (LP); 1 x All Media (Album)",
-                "LP",
-            ),
-            (
-                "2 x Vinyl (LP); 1 x Vinyl (7\", EP); 1 x All Media (Reissue)",
-                "Mixed formats",
-            ),
-            ("1 x Vinyl (LP); 1 x CD (Album)", "Mixed formats"),
-        ] {
-            assert_eq!(format_category(Some(format)), expected, "{format}");
-        }
-        assert_eq!(format_category(None), "Unknown");
-    }
-
-    #[test]
-    fn grouping_preserves_item_totals_and_sorts_by_count_then_name() {
-        let grouped = group_formats(vec![
-            (Some("1 x Vinyl (LP, Album, Stereo)".into()), 43),
-            (Some("1 x Vinyl (LP, Album)".into()), 43),
-            (Some("2 x Vinyl (LP, Album)".into()), 13),
-            (Some("1 x Vinyl (7\", Single)".into()), 9),
-            (Some("CD".into()), 9),
-            (None, 1),
-        ]);
-        assert_eq!(
-            grouped,
-            vec![
-                json!({"name": "LP", "count": 99}),
-                json!({"name": "7″", "count": 9}),
-                json!({"name": "CD", "count": 9}),
-                json!({"name": "Unknown", "count": 1}),
-            ]
-        );
-        assert_eq!(
-            grouped
-                .iter()
-                .map(|row| row["count"].as_i64().unwrap())
-                .sum::<i64>(),
-            118
-        );
-        assert!(group_formats(vec![]).is_empty());
-    }
 }
