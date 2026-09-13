@@ -1206,6 +1206,44 @@ async fn sync_queue_enforces_approval_csrf_deduplication_daily_schedule_and_work
 }
 
 #[tokio::test]
+async fn dashboard_shows_only_latest_valued_snapshot() {
+    let (pool, admin, schema) = database().await;
+    let server = MockServer::start().await;
+    provider(&server, 101).await;
+    let mut alice = browser(&pool, &server);
+    alice.login().await;
+    let id = alice.me().await["user"]["id"].as_i64().unwrap();
+    sqlx::query("UPDATE users SET status='approved' WHERE id=$1")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO user_collection_history (user_id,timestamp,total_items,value_median,currency) VALUES ($1,'2025-01-01T00:00:00Z',2,50,'USD'),($1,'2025-02-01T00:00:00Z',2,0,'EUR'),($1,'2025-03-01T00:00:00Z',3,NULL,NULL),($1,'2025-04-01T00:00:00Z',4,NULL,'EUR')")
+        .bind(id).execute(&pool).await.unwrap();
+    let (status, _, body) = alice.request("GET", "/api/dashboard", "", None).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let data: serde_json::Value = serde_json::from_str(&body).unwrap();
+    let summaries = data["summaries"].as_array().unwrap();
+    assert_eq!(summaries.len(), 1);
+    assert_eq!(summaries[0]["timestamp"], "2025-02-01T00:00:00Z");
+    assert_eq!(summaries[0]["currency"], "EUR");
+    assert_eq!(summaries[0]["median"], "0");
+    assert_eq!(data["history_total"], 4);
+    assert_eq!(data["history_rows"][0]["total_items"], 4);
+    assert_eq!(data["history"].as_array().unwrap().len(), 4);
+    sqlx::query("UPDATE user_collection_history SET value_median=NULL WHERE user_id=$1")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (_, _, body) = alice.request("GET", "/api/dashboard", "", None).await;
+    let data: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert!(data["summaries"].as_array().unwrap().is_empty());
+    assert_eq!(data["history_total"], 4);
+    cleanup(pool, admin, schema).await;
+}
+
+#[tokio::test]
 async fn dashboard_bounds_history_and_keeps_all_rows_accessible() {
     let (pool, admin, schema) = database().await;
     let server = MockServer::start().await;
