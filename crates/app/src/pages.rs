@@ -417,9 +417,6 @@ fn HistoryChart(data: Remote) -> impl IntoView {
                 </div>
             </div>
             <Chart options label="Collection history with zoom and pan" />
-            <p class="muted">
-                "Drag the slider to zoom. Values retain their original currency; no conversion is applied."
-            </p>
             {move || {
                 currencies
                     .get()
