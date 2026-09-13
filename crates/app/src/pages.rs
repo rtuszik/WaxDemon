@@ -553,7 +553,7 @@ pub fn Library() -> impl IntoView {
     let data = remote(Signal::derive(move || {
         crate::remote::with_query("/api/library", &location.search.get())
     }));
-    let grid = RwSignal::new(true);
+    let grid = RwSignal::new(false);
     let page = Memo::new(move |_| serde_json::from_value::<LibraryPage>(data.data.get()).ok());
     let page_link = move |offset: i64| {
         let mut params: Vec<(String, String)> =
