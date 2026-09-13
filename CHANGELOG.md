@@ -2,6 +2,34 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.5.0](https://github.com/rtuszik/WaxDemon/compare/157af6aa2800b7e48946bc80120d9aedac579306..v1.5.0) - 2026-09-13
+#### Features
+- (**dev**) add local development task with environment config - ([78b40da](https://github.com/rtuszik/WaxDemon/commit/78b40da0b1d124cf042113f892fd6b05bccaf429)) - [@rtuszik](https://github.com/rtuszik)
+#### Refactoring
+- remove chart currency selection control - ([40f9eff](https://github.com/rtuszik/WaxDemon/commit/40f9eff8f323cc241b6fd0cf1a04ced85171d859)) - [@rtuszik](https://github.com/rtuszik)
+#### Miscellaneous Chores
+- (**deps**) update azure/setup-helm digest to 9bc31f4 - ([b6a482b](https://github.com/rtuszik/WaxDemon/commit/b6a482b08bf9c3e6c1889cf6fbc860f4968ac690)) - koalabot-rt[bot]
+- (**deps**) update docker/login-action digest to dbcb813 - ([6d52f35](https://github.com/rtuszik/WaxDemon/commit/6d52f35d9508d31f601819f0ad95efa7d7a3f2a9)) - koalabot-rt[bot]
+- (**deps**) update docker/metadata-action digest to dc80280 - ([2aad021](https://github.com/rtuszik/WaxDemon/commit/2aad0213859ae5df34c90ec1ded89fce3930987c)) - koalabot-rt[bot]
+- (**deps**) update docker/build-push-action digest to 53b7df9 - ([c0163e1](https://github.com/rtuszik/WaxDemon/commit/c0163e151b518659564d00ff5e8c71c6df2970bf)) - koalabot-rt[bot]
+- (**deps**) update docker/setup-buildx-action digest to 37fe631 - ([b1974b2](https://github.com/rtuszik/WaxDemon/commit/b1974b2c0e0cedde3bea032b3cb6edb777fc2e19)) - koalabot-rt[bot]
+- (**deps**) update rust crate async-trait to v0.1.92 - ([e5972f4](https://github.com/rtuszik/WaxDemon/commit/e5972f463bf080480e3258a3a9cc7702cb8b67b2)) - koalabot-rt[bot]
+- (**deps**) update jdx/mise-action digest to c2a8761 - ([ed50c08](https://github.com/rtuszik/WaxDemon/commit/ed50c081c1eae4a31ea55f3445c7268e9d8212c8)) - koalabot-rt[bot]
+- (**deps**) update swatinem/rust-cache digest to 6323deb - ([8d95bf9](https://github.com/rtuszik/WaxDemon/commit/8d95bf9b2db4c530758b18380be4ffb2db6c2a30)) - koalabot-rt[bot]
+- (**deps**) update rust crate thiserror to v2.0.20 - ([f10fa72](https://github.com/rtuszik/WaxDemon/commit/f10fa727c2ec41d250899bd9315a7d5cb1950912)) - koalabot-rt[bot]
+- (**deps**) update rust crate leptos_axum to v0.8.10 - ([5e05ca6](https://github.com/rtuszik/WaxDemon/commit/5e05ca6633965933c08f88e0ba0dcecf883c9341)) - koalabot-rt[bot]
+- (**deps**) update rust crate leptos_router to v0.8.15 - ([1ff84fa](https://github.com/rtuszik/WaxDemon/commit/1ff84faff51822af997337e8f8f70208255c0ab1)) - koalabot-rt[bot]
+- (**deps**) update rust crate reqwest to v0.13.4 - ([6bfe937](https://github.com/rtuszik/WaxDemon/commit/6bfe937f8245777896c91196971d0372489195a4)) - koalabot-rt[bot]
+- (**deps**) update dependency helm to v3.21.4 - ([cb9e205](https://github.com/rtuszik/WaxDemon/commit/cb9e205293a7a16af6c208fd49d828f4e6dd3889)) - koalabot-rt[bot]
+- (**deps**) update dependency jdx/mise to v2026.9.1 - ([89b58ec](https://github.com/rtuszik/WaxDemon/commit/89b58ec648c4365243356cccf38910e5f85e9894)) - koalabot-rt[bot]
+- (**deps**) update rust crate tower-http to 0.7 - ([d3ca7b7](https://github.com/rtuszik/WaxDemon/commit/d3ca7b719b485444515a18fb1dd53cc7e8fed33f)) - koalabot-rt[bot]
+- (**deps**) update dependency oxfmt to v0.66.0 - ([5958854](https://github.com/rtuszik/WaxDemon/commit/5958854eb864a7db64caa30769c408af090045e8)) - koalabot-rt[bot]
+- (**deps**) update actions/checkout action to v7 - ([0ba5ead](https://github.com/rtuszik/WaxDemon/commit/0ba5eade8130449db22ee67a23ef69f656eff4db)) - koalabot-rt[bot]
+#### Style
+- remove history chart currency note - ([157af6a](https://github.com/rtuszik/WaxDemon/commit/157af6aa2800b7e48946bc80120d9aedac579306)) - [@rtuszik](https://github.com/rtuszik)
+
+- - -
+
 ## [v1.4.1](https://github.com/rtuszik/WaxDemon/compare/3a1cd8010c1b4154e0ece33ba5787ba6a0adb3c1..v1.4.1) - 2026-09-13
 #### Bug Fixes
 - (**hooks**) limit source checks to pre-commit - ([3a1cd80](https://github.com/rtuszik/WaxDemon/commit/3a1cd8010c1b4154e0ece33ba5787ba6a0adb3c1)) - [@rtuszik](https://github.com/rtuszik)
