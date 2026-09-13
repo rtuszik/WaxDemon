@@ -416,15 +416,33 @@ async fn invalid_price_currencies_preserve_cached_values_and_warn() {
     let (pool, admin, schema) = database().await;
     let alice = user(&pool, 11, "alice").await;
     let server = MockServer::start().await;
-    collection(&server, "alice", vec![entry(100, "Mint (M)")], 1).await;
+    collection(
+        &server,
+        "alice",
+        vec![
+            entry(100, "Mint (M)"),
+            entry(101, "Mint (M)"),
+            entry(102, "Mint (M)"),
+        ],
+        3,
+    )
+    .await;
     Mock::given(path("/marketplace/price_suggestions/42"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-            "Mint (M)":{"currency":"EUR","value":15}
+            "Mint (M)":{"currency":"EUR","value":15},
+            "Very Good (VG)":{"currency":"EUR","value":7}
         })))
         .mount(&server)
         .await;
     run(&pool, &client(&server, "alice"), &alice).await.unwrap();
+    let cached_before: Value = sqlx::query_scalar("SELECT jsonb_agg(to_jsonb(p) ORDER BY condition) FROM user_price_suggestions p WHERE user_id=$1")
+        .bind(alice.user_id).fetch_one(&pool).await.unwrap();
     for currency in ["USD", "XYZ"] {
+        sqlx::query("UPDATE user_collection_items SET condition='Mint (M)',suggested_value=15,currency='EUR' WHERE user_id=$1")
+            .bind(alice.user_id).execute(&pool).await.unwrap();
+        Mock::given(path("/users/alice/collection/folders/0/releases"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"pagination":{"page":1,"pages":1,"per_page":100,"items":3,"urls":{}},"releases":[entry(100,"Mint (M)"),entry(101,"Very Good (VG)"),entry(102,"Poor (P)")]})))
+            .with_priority(1).up_to_n_times(1).mount(&server).await;
         sqlx::query("UPDATE user_price_cache SET fetched_at=now()-interval '2 days'")
             .execute(&pool)
             .await
@@ -439,22 +457,34 @@ async fn invalid_price_currencies_preserve_cached_values_and_warn() {
             .mount(&server)
             .await;
         run(&pool, &client(&server, "alice"), &alice).await.unwrap();
-        let item: (String, String) = sqlx::query_as(
-            "SELECT suggested_value::text,currency FROM user_collection_items WHERE user_id=$1",
-        )
-        .bind(alice.user_id)
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-        assert_eq!(item, ("15".into(), "EUR".into()));
-        let cached: Vec<(String, String)> = sqlx::query_as(
-            "SELECT amount::text,currency FROM user_price_suggestions WHERE user_id=$1",
+        let items: Vec<(String, Option<String>, Option<String>, bool)> = sqlx::query_as(
+            "SELECT condition,suggested_value::text,currency,last_value_check IS NOT NULL FROM user_collection_items WHERE user_id=$1 ORDER BY instance_id",
         )
         .bind(alice.user_id)
         .fetch_all(&pool)
         .await
         .unwrap();
-        assert_eq!(cached, vec![("15".into(), "EUR".into())]);
+        assert_eq!(
+            items,
+            vec![
+                (
+                    "Mint (M)".into(),
+                    Some("15".into()),
+                    Some("EUR".into()),
+                    true
+                ),
+                (
+                    "Very Good (VG)".into(),
+                    Some("7".into()),
+                    Some("EUR".into()),
+                    true
+                ),
+                ("Poor (P)".into(), None, None, false),
+            ]
+        );
+        let cached: Value = sqlx::query_scalar("SELECT jsonb_agg(to_jsonb(p) ORDER BY condition) FROM user_price_suggestions p WHERE user_id=$1")
+            .bind(alice.user_id).fetch_one(&pool).await.unwrap();
+        assert_eq!(cached, cached_before);
         let warnings: Vec<String> =
             sqlx::query_scalar("SELECT warnings FROM user_sync_runs WHERE id=$1")
                 .bind(alice.run_id)
