@@ -3,6 +3,7 @@
 [tools]
 "cargo:cargo-edit" = "0.13.13"
 "cargo:cargo-leptos" = "0.3.7"
+"cargo:leptosfmt" = "latest"
 cocogitto = "7.0.0"
 opengrep = "latest"
 oxfmt = "0.64.0"
