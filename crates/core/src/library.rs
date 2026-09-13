@@ -11,6 +11,8 @@ pub struct LibraryQuery {
     #[serde(default, deserialize_with = "empty_number")]
     pub year: Option<i32>,
     #[serde(default, deserialize_with = "empty_number")]
+    pub decade: Option<i32>,
+    #[serde(default, deserialize_with = "empty_number")]
     pub folder_id: Option<i64>,
     pub genre: Option<String>,
     pub format: Option<String>,
