@@ -145,6 +145,21 @@ pub fn breakdown_options(values: &[Value]) -> Value {
     })
 }
 
+pub(crate) fn breakdown_link(filter: &str, name: &str) -> Option<String> {
+    if matches!(filter, "year" | "decade") && name == "Unknown" {
+        return None;
+    }
+    let value = if filter == "decade" {
+        name.strip_suffix('s')?
+    } else {
+        name
+    };
+    let query = url::form_urlencoded::Serializer::new(String::new())
+        .append_pair(filter, value)
+        .finish();
+    Some(format!("/library?{query}"))
+}
+
 #[component]
 pub fn Chart(
     options: Signal<Value>,
@@ -187,12 +202,9 @@ pub fn Chart(
                         if let Some(filter) = filter
                             && let Ok(name) = js_sys::Reflect::get(&event, &"name".into())
                             && let Some(name) = name.as_string()
-                            && !(filter == "year" && name == "Unknown")
+                            && let Some(href) = breakdown_link(filter, &name)
                         {
-                            let query = url::form_urlencoded::Serializer::new(String::new())
-                                .append_pair(filter, &name)
-                                .finish();
-                            navigate(&format!("/library?{query}"), Default::default());
+                            navigate(&href, Default::default());
                         }
                     });
                     let _ = chart.on("click", click.as_ref().unchecked_ref());
@@ -234,7 +246,7 @@ pub fn Chart(
             error.get().then(|| {
                 view! {
                     <p class="error">
-                        "Chart could not be displayed. The data is available below."
+                        "Chart could not be displayed."
                     </p>
                 }
             })
@@ -295,6 +307,24 @@ mod browser {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn breakdown_links_use_decade_start_and_preserve_other_filters() {
+        assert_eq!(
+            breakdown_link("decade", "1990s").as_deref(),
+            Some("/library?decade=1990")
+        );
+        assert_eq!(breakdown_link("decade", "Unknown"), None);
+        assert_eq!(breakdown_link("year", "Unknown"), None);
+        assert_eq!(
+            breakdown_link("genre", "Jazz & Blues").as_deref(),
+            Some("/library?genre=Jazz+%26+Blues")
+        );
+        assert_eq!(
+            breakdown_link("format", "Unknown").as_deref(),
+            Some("/library?format=Unknown")
+        );
+    }
 
     #[test]
     fn valuation_never_combines_currencies_or_turns_missing_prices_into_zero() {

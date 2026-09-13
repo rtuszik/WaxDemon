@@ -35,6 +35,9 @@ fn validate(query: &LibraryQuery) -> Result<(u32, u32, &'static str), AuthError>
     if page == 0
         || page > 1_000_000
         || !(1..=100).contains(&size)
+        || query
+            .decade
+            .is_some_and(|decade| !(0..=9990).contains(&decade) || decade % 10 != 0)
         || [
             &query.q,
             &query.genre,
@@ -86,6 +89,13 @@ fn predicates<'a>(builder: &mut QueryBuilder<'a, Postgres>, user: i64, query: &'
     }
     if let Some(year) = query.year {
         builder.push(" AND r.year=").push_bind(year);
+    }
+    if let Some(decade) = query.decade {
+        builder
+            .push(" AND r.year>0 AND r.year BETWEEN ")
+            .push_bind(decade)
+            .push(" AND ")
+            .push_bind(decade + 9);
     }
     if let Some(folder) = query.folder_id {
         builder.push(" AND i.folder_id=").push_bind(folder);
@@ -184,7 +194,6 @@ pub(super) async fn filters(
 #[derive(Deserialize)]
 pub(super) struct Range {
     range: Option<String>,
-    history_page: Option<u32>,
 }
 
 pub(super) async fn dashboard(
@@ -193,10 +202,6 @@ pub(super) async fn dashboard(
     Query(range): Query<Range>,
 ) -> Result<Json<Value>, AuthError> {
     let user = approved(&auth)?.id;
-    let history_page = range.history_page.unwrap_or(1);
-    if history_page == 0 {
-        return Err(bad_request());
-    }
     let days = match range.range.as_deref().unwrap_or("all") {
         "all" => None,
         "1m" => Some(30),
@@ -219,10 +224,6 @@ pub(super) async fn dashboard(
     ) SELECT jsonb_build_object('timestamp',timestamp,'total_items',total_items,'minimum',value_min::text,'median',value_median::text,'maximum',value_max::text,'currency',currency)
     FROM ranked WHERE rn=n OR (rn-1)%GREATEST(1,ceil(n/998.0)::bigint)=0 ORDER BY timestamp::timestamptz,timestamp")
         .bind(user).bind(days).fetch_all(&state.pool).await?;
-    let history_total: i64 = sqlx::query_scalar("SELECT count(*) FROM user_collection_history WHERE user_id=$1 AND ($2::int IS NULL OR timestamp::timestamptz>=now()-make_interval(days=>$2))")
-        .bind(user).bind(days).fetch_one(&state.pool).await?;
-    let history_rows: Vec<Value> = sqlx::query_scalar("SELECT jsonb_build_object('timestamp',timestamp,'total_items',total_items,'minimum',value_min::text,'median',value_median::text,'maximum',value_max::text,'currency',currency) FROM user_collection_history WHERE user_id=$1 AND ($2::int IS NULL OR timestamp::timestamptz>=now()-make_interval(days=>$2)) ORDER BY timestamp::timestamptz DESC,timestamp DESC LIMIT 50 OFFSET $3")
-        .bind(user).bind(days).bind(i64::from(history_page-1)*50).fetch_all(&state.pool).await?;
     let formats:Vec<Value>=sqlx::query_scalar("SELECT jsonb_build_object('name',COALESCE(r.format,'Unknown'),'count',count(*)) FROM user_collection_items i JOIN releases r ON r.id=i.release_id WHERE i.user_id=$1 GROUP BY r.format ORDER BY count(*) DESC")
         .bind(user).fetch_all(&state.pool).await?;
     let genres:Vec<Value>=sqlx::query_scalar("SELECT jsonb_build_object('name',genre,'count',count(*)) FROM user_collection_items i JOIN releases r ON r.id=i.release_id CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(NULLIF(r.genres,'')::jsonb,'[]'::jsonb)) genre WHERE i.user_id=$1 GROUP BY genre ORDER BY count(*) DESC")
@@ -235,8 +236,19 @@ pub(super) async fn dashboard(
             .flatten();
     let summaries: Vec<Value> = sqlx::query_scalar("SELECT to_jsonb(s) FROM (SELECT currency,timestamp,total_items,value_min::text AS minimum,value_median::text AS median,value_max::text AS maximum,(value_median/NULLIF(total_items,0))::text AS average FROM user_collection_history WHERE user_id=$1 AND (value_min IS NOT NULL OR value_median IS NOT NULL OR value_max IS NOT NULL) ORDER BY timestamp::timestamptz DESC,timestamp DESC LIMIT 1) s")
         .bind(user).fetch_all(&state.pool).await?;
-    let years: Vec<Value> = sqlx::query_scalar("SELECT jsonb_build_object('name',CASE WHEN r.year>0 THEN r.year::text ELSE 'Unknown' END,'count',count(*)) FROM user_collection_items i JOIN releases r ON r.id=i.release_id WHERE i.user_id=$1 GROUP BY CASE WHEN r.year>0 THEN r.year::text ELSE 'Unknown' END ORDER BY count(*) DESC,CASE WHEN r.year>0 THEN r.year::text ELSE 'Unknown' END")
-        .bind(user).fetch_all(&state.pool).await?;
+    let decades: Vec<Value> = sqlx::query_scalar(
+        "SELECT jsonb_build_object(
+            'name', CASE WHEN decade IS NULL THEN 'Unknown' ELSE decade::text || 's' END,
+            'count', count(*)
+        ) FROM (
+            SELECT CASE WHEN r.year>0 THEN r.year/10*10 END AS decade
+            FROM user_collection_items i JOIN releases r ON r.id=i.release_id
+            WHERE i.user_id=$1
+        ) years GROUP BY decade ORDER BY decade NULLS LAST",
+    )
+    .bind(user)
+    .fetch_all(&state.pool)
+    .await?;
     let rankings_query = format!(
         "WITH items AS (SELECT {ITEM_COLUMNS},row_number() OVER (PARTITION BY v.currency ORDER BY v.amount DESC,i.instance_id) AS high,row_number() OVER (PARTITION BY v.currency ORDER BY v.amount ASC,i.instance_id) AS low {ITEM_FROM} WHERE i.user_id=$1 AND v.amount IS NOT NULL) SELECT jsonb_build_object('currency',currency,'top',jsonb_agg(to_jsonb(items)-'high'-'low' ORDER BY high) FILTER (WHERE high<=10),'bottom',jsonb_agg(to_jsonb(items)-'high'-'low' ORDER BY low) FILTER (WHERE low<=10)) FROM items WHERE high<=10 OR low<=10 GROUP BY currency ORDER BY currency"
     );
@@ -252,7 +264,7 @@ pub(super) async fn dashboard(
         .fetch_all(&state.pool)
         .await?;
     Ok(Json(
-        json!({"total_items":total,"values":values,"history":history,"history_rows":history_rows,"history_total":history_total,"history_page":history_page,"formats":formats,"genres":genres,"years":years,"summaries":summaries,"rankings":rankings,"additions":additions,"display_currency":display_currency}),
+        json!({"total_items":total,"values":values,"history":history,"formats":formats,"genres":genres,"decades":decades,"summaries":summaries,"rankings":rankings,"additions":additions,"display_currency":display_currency}),
     ))
 }
 

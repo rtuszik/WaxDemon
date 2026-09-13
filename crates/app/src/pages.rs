@@ -1,4 +1,4 @@
-use crate::charts::{Chart, breakdown_options, history_options};
+use crate::charts::{Chart, breakdown_link, breakdown_options, history_options};
 use crate::{
     Bootstrap,
     remote::{Remote, Status, money, post, remote, text},
@@ -189,19 +189,19 @@ fn Dashboard() -> impl IntoView {
         }}
         <div class="two-columns">
             <section class="panel">
-                <h2>"Year distribution"</h2>
+                <h2>"Decade distribution"</h2>
                 <Chart
                     options=Signal::derive(move || breakdown_options(
-                        data.data.get()["years"].as_array().map(Vec::as_slice).unwrap_or_default(),
+                        data.data.get()["decades"].as_array().map(Vec::as_slice).unwrap_or_default(),
                     ))
-                    label="Collection by release year; select a slice to filter the library"
-                    filter="year"
+                    label="Collection by release decade; select a slice to filter the library"
+                    filter="decade"
                 />
                 <div class="breakdown">
                     {move || {
                         data
                             .data
-                            .get()["years"]
+                            .get()["decades"]
                             .as_array()
                             .cloned()
                             .unwrap_or_default()
@@ -210,11 +210,11 @@ fn Dashboard() -> impl IntoView {
                                 let name = text(&v, "name");
                                 view! {
                                     <div>
-                                        {if name == "Unknown" {
-                                            view! { <span>{name}</span> }.into_any()
-                                        } else {
-                                            view! { <A href=format!("/library?year={name}")>{name}</A> }
+                                        {if let Some(href) = breakdown_link("decade", &name) {
+                                            view! { <A href=href>{name}</A> }
                                                 .into_any()
+                                        } else {
+                                            view! { <span>{name}</span> }.into_any()
                                         }}<strong>{v["count"].as_i64()}</strong>
                                     </div>
                                 }
@@ -289,7 +289,6 @@ fn Dashboard() -> impl IntoView {
                 })
                 .collect_view()}
         </div>
-        <HistoryTable data />
     }
 }
 
@@ -347,91 +346,6 @@ fn RecordList(title: String, items: Vec<Value>) -> impl IntoView {
 #[component]
 fn EstimateLabel(condition: Option<String>) -> impl IntoView {
     condition.map(|condition|view! { <small class="muted estimate-label">{format!("{condition} estimate")}</small> })
-}
-
-#[component]
-fn HistoryTable(data: Remote) -> impl IntoView {
-    let location = use_location();
-    let page = Signal::derive(move || data.data.get()["history_page"].as_u64().unwrap_or(1));
-    let total = Signal::derive(move || data.data.get()["history_total"].as_u64().unwrap_or(0));
-    let page_url = move |page: u64| {
-        let search = location.search.get();
-        let mut query: Vec<(String, String)> =
-            url::form_urlencoded::parse(search.trim_start_matches('?').as_bytes())
-                .filter(|(key, _)| key != "history_page")
-                .map(|(k, v)| (k.into_owned(), v.into_owned()))
-                .collect();
-        query.push(("history_page".into(), page.to_string()));
-        format!(
-            "/?{}",
-            url::form_urlencoded::Serializer::new(String::new())
-                .extend_pairs(query)
-                .finish()
-        )
-    };
-    view! {
-        <section class="panel history-table">
-            <h3>"Collection valuation history"</h3>
-            <p class="muted">
-                "Charts sample large histories. Every snapshot is available in this table. Different currencies are never combined."
-            </p>
-            <div class="table-scroll">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>"Date"</th>
-                            <th>"Records"</th>
-                            <th>"Minimum"</th>
-                            <th>"Median"</th>
-                            <th>"Maximum"</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {move || {
-                            data
-                                .data
-                                .get()["history_rows"]
-                                .as_array()
-                                .cloned()
-                                .unwrap_or_default()
-                                .into_iter()
-                                .map(|v| {
-                                    view! {
-                                        <tr>
-                                            <td>{text(&v, "timestamp")}</td>
-                                            <td>{v["total_items"].as_i64()}</td>
-                                            <td>
-                                                {money(v["minimum"].as_str(), v["currency"].as_str())}
-                                            </td>
-                                            <td>
-                                                {money(v["median"].as_str(), v["currency"].as_str())}
-                                            </td>
-                                            <td>
-                                                {money(v["maximum"].as_str(), v["currency"].as_str())}
-                                            </td>
-                                        </tr>
-                                    }
-                                })
-                                .collect_view()
-                        }}
-                    </tbody>
-                </table>
-            </div>
-            <nav class="pagination" aria-label="History pages">
-                {move || {
-                    (page.get() > 1)
-                        .then(|| view! { <A href=page_url(page.get() - 1)>"Previous"</A> })
-                }}
-                <span>
-                    {move || format!("Page {} of {}", page.get(), total.get().div_ceil(50).max(1))}
-                </span>
-                {move || {
-                    (page.get() * 50 < total.get())
-                        .then(|| view! { <A href=page_url(page.get() + 1)>"Next"</A> })
-                }}
-            </nav>
-        </section>
-    }
 }
 
 #[component]
@@ -712,6 +626,18 @@ pub fn Library() -> impl IntoView {
                     min="0"
                     max="9999"
                     value=move || query.get().get("year").unwrap_or_default()
+                />
+            </label>
+            <label>
+                "Decade"
+                <input
+                    name="decade"
+                    type="number"
+                    min="0"
+                    max="9990"
+                    step="10"
+                    placeholder="1990"
+                    value=move || query.get().get("decade").unwrap_or_default()
                 />
             </label>
             <label>

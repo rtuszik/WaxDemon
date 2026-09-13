@@ -335,7 +335,11 @@ async fn browser_hydration_library_settings_and_chart_lifecycle() {
     driver.snapshot("history-chart").await;
     driver.script("window.scrollTo(0,0)").await;
     assert_eq!(driver.script("return echarts.getInstanceByDom(document.querySelector('.chart')).getOption().yAxis[0].name").await,"EUR");
-    assert!(driver.script("return document.querySelector('.metrics').textContent.includes('Value (median)') && document.body.textContent.includes('Top valuable') && document.body.textContent.includes('Latest additions') && document.body.textContent.includes('Year distribution')").await.as_bool().unwrap());
+    assert!(driver.script("return document.querySelector('.metrics').textContent.includes('Value (median)') && document.body.textContent.includes('Top valuable') && document.body.textContent.includes('Latest additions') && document.body.textContent.includes('Decade distribution')").await.as_bool().unwrap());
+    assert_eq!(
+        driver.script("return echarts.getInstanceByDom(document.querySelector('[data-chart*=\"release decade\"]')).getOption().series[0].data").await,
+        serde_json::json!([{"name": "2020s", "value": 2}])
+    );
     driver.script("window.testChart=echarts.getInstanceByDom(document.querySelector('.chart')); testChart.dispatchAction({type:'dataZoom',start:25,end:75}); document.querySelector('[aria-label=\"Chart currency\"]').dispatchEvent(new Event('change',{bubbles:true}));").await;
     driver.wait("testChart.getOption().series.length===3").await;
     assert_eq!(
@@ -344,13 +348,21 @@ async fn browser_hydration_library_settings_and_chart_lifecycle() {
             .await,
         25
     );
-    driver.click("header nav a[href='/library']").await;
+    driver
+        .click(".breakdown a[href='/library?decade=2020']")
+        .await;
     driver
         .wait(
             "document.querySelectorAll('tbody tr').length===2 && !document.querySelector('.chart')",
         )
         .await;
     assert_eq!(driver.script("return testChart.isDisposed()").await, true);
+    assert_eq!(
+        driver
+            .script("return document.querySelector('input[name=decade]').value")
+            .await,
+        "2020"
+    );
     assert_original_styles(&driver).await;
     driver.snapshot("library-table").await;
     driver.wait("document.querySelector('tbody').textContent.includes('Mint (M) estimate') && document.querySelector('tbody').textContent.includes('20.25')").await;
@@ -771,7 +783,7 @@ async fn rendered_pages_escape_private_data_and_preserve_empty_filters_and_saved
     let (status, headers, body) = owner
         .request(
             "GET",
-            "/library?q=&year=&folder_id=&genre=&format=&condition=&currency=&sort=added_desc",
+            "/library?q=&year=&decade=&folder_id=&genre=&format=&condition=&currency=&sort=added_desc",
             "",
             None,
         )
@@ -913,7 +925,12 @@ async fn library_dashboard_and_settings_are_user_scoped_paginated_and_currency_a
     assert_eq!(dashboard["genres"].as_array().unwrap().len(), 2);
     assert_eq!(dashboard["summaries"][0]["median"], "50");
     assert_eq!(dashboard["summaries"][0]["average"], "25.0000000000000000");
-    assert_eq!(dashboard["years"].as_array().unwrap().len(), 2);
+    assert_eq!(
+        dashboard["decades"],
+        serde_json::json!([
+            {"name": "2020s", "count": 2}
+        ])
+    );
     assert_eq!(dashboard["rankings"].as_array().unwrap().len(), 2);
     let (_, _, body) = alice
         .request("GET", "/api/dashboard?range=3m", "", None)
@@ -1242,8 +1259,6 @@ async fn dashboard_shows_only_latest_valued_snapshot() {
     assert_eq!(summaries[0]["timestamp"], "2025-02-01T00:00:00Z");
     assert_eq!(summaries[0]["currency"], "EUR");
     assert_eq!(summaries[0]["median"], "0");
-    assert_eq!(data["history_total"], 4);
-    assert_eq!(data["history_rows"][0]["total_items"], 4);
     assert_eq!(data["history"].as_array().unwrap().len(), 4);
     sqlx::query("UPDATE user_collection_history SET value_median=NULL WHERE user_id=$1")
         .bind(id)
@@ -1253,12 +1268,12 @@ async fn dashboard_shows_only_latest_valued_snapshot() {
     let (_, _, body) = alice.request("GET", "/api/dashboard", "", None).await;
     let data: serde_json::Value = serde_json::from_str(&body).unwrap();
     assert!(data["summaries"].as_array().unwrap().is_empty());
-    assert_eq!(data["history_total"], 4);
+    assert_eq!(data["history"].as_array().unwrap().len(), 4);
     cleanup(pool, admin, schema).await;
 }
 
 #[tokio::test]
-async fn dashboard_bounds_history_and_keeps_all_rows_accessible() {
+async fn dashboard_bounds_chart_history() {
     let (pool, admin, schema) = database().await;
     let server = MockServer::start().await;
     provider(&server, 101).await;
@@ -1284,30 +1299,6 @@ async fn dashboard_bounds_history_and_keeps_all_rows_accessible() {
     assert!(history.len() <= 1000);
     assert_eq!(history.first().unwrap()["total_items"], 1);
     assert_eq!(history.last().unwrap()["total_items"], 10001);
-    assert_eq!(data["history_total"], 10001);
-    assert_eq!(data["history_rows"].as_array().unwrap().len(), 50);
-    assert_eq!(data["history_rows"][0]["total_items"], 10001);
-    for (page, count, first) in [(2, 50, 9951), (201, 1, 1)] {
-        let (status, _, body) = alice
-            .request(
-                "GET",
-                &format!("/api/dashboard?history_page={page}"),
-                "",
-                None,
-            )
-            .await;
-        assert_eq!(status, StatusCode::OK);
-        let data: serde_json::Value = serde_json::from_str(&body).unwrap();
-        assert_eq!(data["history_rows"].as_array().unwrap().len(), count);
-        assert_eq!(data["history_rows"][0]["total_items"], first);
-    }
-    assert_eq!(
-        alice
-            .request("GET", "/api/dashboard?history_page=0", "", None)
-            .await
-            .0,
-        StatusCode::BAD_REQUEST
-    );
     let response = alice
         .app
         .clone()
@@ -1325,6 +1316,89 @@ async fn dashboard_bounds_history_and_keeps_all_rows_accessible() {
     assert_eq!(response.headers()["content-encoding"], "gzip");
     let compressed = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     assert!(compressed.len() < body.len() / 2);
+    cleanup(pool, admin, schema).await;
+}
+
+#[tokio::test]
+async fn dashboard_decades_group_years_and_filter_the_library() {
+    let (pool, admin, schema) = database().await;
+    let server = MockServer::start().await;
+    provider(&server, 101).await;
+    let mut alice = browser(&pool, &server);
+    alice.login().await;
+    let alice_id = alice.me().await["user"]["id"].as_i64().unwrap();
+    provider(&server, 102).await;
+    let mut bob = browser(&pool, &server);
+    bob.login().await;
+    let bob_id = bob.me().await["user"]["id"].as_i64().unwrap();
+    sqlx::query("UPDATE users SET status='approved'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    for (id, year) in [
+        (1_i64, Some(1989)),
+        (2, Some(1990)),
+        (3, Some(1999)),
+        (4, Some(2000)),
+        (5, Some(0)),
+        (6, None),
+    ] {
+        sqlx::query("INSERT INTO releases (id,year) VALUES ($1,$2)")
+            .bind(id)
+            .bind(year)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO user_collection_items (user_id,instance_id,release_id,added_date) VALUES ($1,$2,$2,'2025-01-01')")
+            .bind(alice_id).bind(id).execute(&pool).await.unwrap();
+    }
+    for (user, instance) in [(alice_id, 7_i64), (bob_id, 8)] {
+        sqlx::query("INSERT INTO user_collection_items (user_id,instance_id,release_id,added_date) VALUES ($1,$2,2,'2025-01-01')")
+            .bind(user).bind(instance).execute(&pool).await.unwrap();
+    }
+    let (status, _, body) = alice.request("GET", "/api/dashboard", "", None).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let dashboard: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(
+        dashboard["decades"],
+        serde_json::json!([
+            {"name": "1980s", "count": 1},
+            {"name": "1990s", "count": 3},
+            {"name": "2000s", "count": 1},
+            {"name": "Unknown", "count": 2}
+        ])
+    );
+    for (query, expected) in [
+        ("decade=1990", vec![7, 3, 2]),
+        ("decade=1990&year=1999", vec![3]),
+        ("decade=2000", vec![4]),
+        ("decade=2010", vec![]),
+        ("decade=0", vec![]),
+    ] {
+        let (status, _, body) = alice
+            .request("GET", &format!("/api/library?{query}"), "", None)
+            .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let page: waxdemon_core::library::LibraryPage = serde_json::from_str(&body).unwrap();
+        assert_eq!(page.total, expected.len() as i64);
+        assert_eq!(
+            page.items
+                .iter()
+                .map(|item| item.instance_id)
+                .collect::<Vec<_>>(),
+            expected,
+            "{query}"
+        );
+    }
+    for decade in ["1991", "-10", "10000", "2147483647"] {
+        assert_eq!(
+            alice
+                .request("GET", &format!("/api/library?decade={decade}"), "", None)
+                .await
+                .0,
+            StatusCode::BAD_REQUEST
+        );
+    }
     cleanup(pool, admin, schema).await;
 }
 
