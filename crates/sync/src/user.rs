@@ -346,32 +346,31 @@ pub async fn run_locked(
                         .len()
                         > 1
                 {
-                    warn(&mut tx, sync, "Discogs returned invalid or conflicting price currencies; affected prices were not updated.").await?;
-                    tx.commit().await?;
-                    continue;
-                }
-                if let Some(price) = suggestions.values().next() {
-                    if price_currencies
-                        .iter()
-                        .any(|currency| currency != &price.currency)
-                    {
-                        warn(&mut tx, sync, "Discogs price currency differs from other saved prices; each amount retains the currency returned by Discogs.").await?;
+                    warn(&mut tx, sync, "Discogs returned invalid or conflicting price currencies; cached prices were retained.").await?;
+                } else {
+                    if let Some(price) = suggestions.values().next() {
+                        if price_currencies
+                            .iter()
+                            .any(|currency| currency != &price.currency)
+                        {
+                            warn(&mut tx, sync, "Discogs price currency differs from other saved prices; each amount retains the currency returned by Discogs.").await?;
+                        }
+                        price_currencies.insert(price.currency.clone());
                     }
-                    price_currencies.insert(price.currency.clone());
-                }
-                sqlx::query(
-                    "DELETE FROM user_price_suggestions WHERE user_id=$1 AND release_id=$2",
-                )
-                .bind(sync.user_id)
-                .bind(release)
-                .execute(&mut *tx)
-                .await?;
-                for (condition, price) in suggestions {
-                    sqlx::query("INSERT INTO user_price_suggestions (user_id,release_id,currency,condition,amount,fetched_at) VALUES ($1,$2,$3,$4,$5::text::numeric,now())")
+                    sqlx::query(
+                        "DELETE FROM user_price_suggestions WHERE user_id=$1 AND release_id=$2",
+                    )
+                    .bind(sync.user_id)
+                    .bind(release)
+                    .execute(&mut *tx)
+                    .await?;
+                    for (condition, price) in suggestions {
+                        sqlx::query("INSERT INTO user_price_suggestions (user_id,release_id,currency,condition,amount,fetched_at) VALUES ($1,$2,$3,$4,$5::text::numeric,now())")
                         .bind(sync.user_id).bind(release).bind(price.currency).bind(condition).bind(price.value.to_string()).execute(&mut *tx).await?;
-                }
-                sqlx::query("INSERT INTO user_price_cache (user_id,release_id) VALUES ($1,$2) ON CONFLICT (user_id,release_id) DO UPDATE SET fetched_at=now()")
+                    }
+                    sqlx::query("INSERT INTO user_price_cache (user_id,release_id) VALUES ($1,$2) ON CONFLICT (user_id,release_id) DO UPDATE SET fetched_at=now()")
                     .bind(sync.user_id).bind(release).execute(&mut *tx).await?;
+                }
                 tx.commit().await?;
             }
         }
