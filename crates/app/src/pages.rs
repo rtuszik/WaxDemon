@@ -975,9 +975,6 @@ pub fn RecordDetail() -> impl IntoView {
                             })
                             .collect_view()}
                     </div>
-                    <p class="muted">
-                        "All available conditions are shown. For ungraded copies, the headline is a reference estimate for the labelled grade, not your copy’s recorded condition."
-                    </p>
                 </section>
             }
         }}
