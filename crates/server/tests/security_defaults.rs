@@ -348,17 +348,38 @@ async fn cidr_proxy_config_validates_networks_and_rejects_unusable_chains() {
             "{peer} {xff:?}"
         );
     }
-    let request = Request::builder()
-        .uri("/auth/callback")
-        .extension(axum::extract::ConnectInfo(
-            "192.0.2.1:1234".parse::<std::net::SocketAddr>().unwrap(),
-        ))
-        .header("x-forwarded-for", "198.51.100.99")
-        .header("x-forwarded-for", "203.0.113.3")
-        .body(Body::empty())
-        .unwrap();
-    assert_eq!(
-        app.oneshot(request).await.unwrap().status(),
-        StatusCode::BAD_REQUEST
-    );
+}
+
+#[tokio::test]
+async fn duplicate_forwarding_headers_share_the_resolved_clients_quota() {
+    let app = state("https://wax.example")
+        .unwrap()
+        .with_trusted_proxies("192.0.2.0/24")
+        .unwrap()
+        .router();
+    for index in 0..12 {
+        let client = if index == 11 {
+            "203.0.113.4"
+        } else {
+            "203.0.113.3"
+        };
+        let request = Request::builder()
+            .uri("/auth/callback")
+            .extension(axum::extract::ConnectInfo(
+                "192.0.2.1:1234".parse::<std::net::SocketAddr>().unwrap(),
+            ))
+            .header("x-forwarded-for", format!("198.51.100.{}", index + 1))
+            .header("x-forwarded-for", client)
+            .body(Body::empty())
+            .unwrap();
+        assert_eq!(
+            app.clone().oneshot(request).await.unwrap().status(),
+            if index == 10 {
+                StatusCode::TOO_MANY_REQUESTS
+            } else {
+                StatusCode::BAD_REQUEST
+            },
+            "request {index} for {client}"
+        );
+    }
 }
