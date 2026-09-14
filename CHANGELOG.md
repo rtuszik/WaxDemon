@@ -2,6 +2,18 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.6.0](https://github.com/rtuszik/WaxDemon/compare/f37837c5e2c1910da234d29584b2f90930315443..v1.6.0) - 2026-09-14
+#### Features
+- (**auth**) add trusted proxy-aware per-identity rate limiting - ([755a8dd](https://github.com/rtuszik/WaxDemon/commit/755a8dde0fb640766a28106de047406b467d7d23)) - [@rtuszik](https://github.com/rtuszik)
+- (**auth**) add security limits and configurable session lifetimes - ([d9f294a](https://github.com/rtuszik/WaxDemon/commit/d9f294a84f56ad5660ba1531b620d4dd871dbf0a)) - [@rtuszik](https://github.com/rtuszik)
+- (**helm**) disable service account token and set session duration - ([fd415d7](https://github.com/rtuszik/WaxDemon/commit/fd415d7b12dc0c8f29aeb14c30437a2d9fdf2950)) - [@rtuszik](https://github.com/rtuszik)
+#### Tests
+- cover quota sharing across duplicate forwarding headers - ([4b06880](https://github.com/rtuszik/WaxDemon/commit/4b06880bced5b6614989807bbbb4175adc02c95b)) - [@rtuszik](https://github.com/rtuszik)
+#### Miscellaneous Chores
+- secure database configuration and remove exposed port - ([f37837c](https://github.com/rtuszik/WaxDemon/commit/f37837c5e2c1910da234d29584b2f90930315443)) - [@rtuszik](https://github.com/rtuszik)
+
+- - -
+
 ## [v1.5.1](https://github.com/rtuszik/WaxDemon/compare/fd39d81f4b2411bb481160d9aa4ffa3f5d8ddd4f..v1.5.1) - 2026-09-14
 #### Build system
 - cache Docker dependencies and update Rust toolchain - ([0ec08a5](https://github.com/rtuszik/WaxDemon/commit/0ec08a51c514872e18a246d7b286417f4cd6b708)) - [@rtuszik](https://github.com/rtuszik)
