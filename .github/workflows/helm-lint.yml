@@ -47,6 +47,8 @@ jobs:
                   [[ "$rendered" != *'DISCOGS_TOKEN'* ]]
                   [[ "$rendered" == *'DISCOGS_USERNAME: "test-owner"'* ]]
                   [[ "$rendered" == *'type: Recreate'* ]]
+                  [[ "$rendered" == *'automountServiceAccountToken: false'* ]]
+                  [[ "$rendered" == *'SESSION_DAYS: "90"'* ]]
 
             - name: helm template (existingSecret + ingress + autoscaling + httpRoute)
               run: |
