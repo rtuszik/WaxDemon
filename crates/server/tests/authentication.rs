@@ -780,6 +780,7 @@ async fn rendered_pages_escape_private_data_and_preserve_empty_filters_and_saved
     assert!(!body.contains("<script>alert(1)</script>"));
     assert!(!body.contains("private-access"));
     let csp = headers["content-security-policy"].to_str().unwrap();
+    assert!(csp.contains("object-src 'none'"));
     let nonce = csp
         .split("'nonce-")
         .nth(1)
@@ -2034,5 +2035,45 @@ async fn login_start_requires_csrf_and_does_not_send_credentials_on_get() {
         StatusCode::FORBIDDEN
     );
     assert!(server.received_requests().await.unwrap().is_empty());
+    cleanup(pool, admin, schema).await;
+}
+
+#[tokio::test]
+async fn configured_session_lifetime_sets_cookie_and_persisted_deadline() {
+    let (pool, admin, schema) = database().await;
+    let server = MockServer::start().await;
+    provider(&server, 42).await;
+    let mut browser = Browser {
+        app: auth_state(&pool, &server)
+            .with_session_days(7)
+            .unwrap()
+            .router(),
+        cookie: None,
+    };
+    let (headers, _) = browser.login().await;
+    let cookie = headers["set-cookie"].to_str().unwrap();
+    let max_age: i64 = cookie
+        .split("Max-Age=")
+        .nth(1)
+        .unwrap()
+        .split(';')
+        .next()
+        .unwrap()
+        .parse()
+        .unwrap();
+    assert!((7 * 86400 - 5..=7 * 86400).contains(&max_age));
+    let info = browser.me().await;
+    let deadline = info["expires_at"].as_i64().unwrap();
+    assert!(
+        (7 * 86400 - 5..=7 * 86400)
+            .contains(&(deadline - OffsetDateTime::now_utc().unix_timestamp()))
+    );
+    let stored: i64 = sqlx::query_scalar(
+        "SELECT (data->>'auth_expires')::bigint FROM app_sessions WHERE data ? 'auth_expires'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(stored, deadline);
     cleanup(pool, admin, schema).await;
 }

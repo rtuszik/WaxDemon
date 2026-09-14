@@ -2,6 +2,7 @@ mod api;
 pub mod backend;
 pub mod config;
 mod health;
+mod limits;
 mod routes;
 pub mod store;
 mod ui;
@@ -31,6 +32,7 @@ pub struct AuthState {
     pub(super) origin: String,
     pub(super) callback: String,
     pub(super) secure: bool,
+    pub(super) session_days: i64,
 }
 
 impl AuthState {
@@ -73,7 +75,16 @@ impl AuthState {
                 .map_err(|_| AuthError::Configuration)?
                 .to_string(),
             secure: url.scheme() == "https",
+            session_days: SESSION_DAYS,
         })
+    }
+
+    pub fn with_session_days(mut self, days: i64) -> Result<Self, AuthError> {
+        if !(1..=365).contains(&days) {
+            return Err(AuthError::Configuration);
+        }
+        self.session_days = days;
+        Ok(self)
     }
 
     pub async fn with_legacy_owner(mut self, username: Option<String>) -> anyhow::Result<Self> {
