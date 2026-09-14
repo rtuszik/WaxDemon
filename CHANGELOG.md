@@ -2,6 +2,16 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.5.1](https://github.com/rtuszik/WaxDemon/compare/fd39d81f4b2411bb481160d9aa4ffa3f5d8ddd4f..v1.5.1) - 2026-09-14
+#### Build system
+- cache Docker dependencies and update Rust toolchain - ([0ec08a5](https://github.com/rtuszik/WaxDemon/commit/0ec08a51c514872e18a246d7b286417f4cd6b708)) - [@rtuszik](https://github.com/rtuszik)
+#### Miscellaneous Chores
+- (**deps**) update dependency rust (#41) - ([fd39d81](https://github.com/rtuszik/WaxDemon/commit/fd39d81f4b2411bb481160d9aa4ffa3f5d8ddd4f)) - koalabot-rt[bot], koalabot-rt[bot]
+#### Style
+- remove condition estimate disclaimer from record details - ([23964f7](https://github.com/rtuszik/WaxDemon/commit/23964f785ad867c94c2745e39546030ea295252a)) - [@rtuszik](https://github.com/rtuszik)
+
+- - -
+
 ## [v1.5.0](https://github.com/rtuszik/WaxDemon/compare/157af6aa2800b7e48946bc80120d9aedac579306..v1.5.0) - 2026-09-13
 #### Features
 - (**dev**) add local development task with environment config - ([78b40da](https://github.com/rtuszik/WaxDemon/commit/78b40da0b1d124cf042113f892fd6b05bccaf429)) - [@rtuszik](https://github.com/rtuszik)
