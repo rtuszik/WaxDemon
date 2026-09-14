@@ -1,4 +1,4 @@
-FROM rust:1.98-slim AS builder
+FROM rust:1.98.1-slim AS chef
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential pkg-config cmake perl ca-certificates \
@@ -6,7 +6,22 @@ RUN apt-get update \
 
 WORKDIR /build
 RUN rustup target add wasm32-unknown-unknown \
-    && cargo install cargo-leptos --version 0.3.7 --locked
+    && cargo install cargo-leptos --version 0.3.7 --locked \
+    && cargo install cargo-chef --version 0.1.78 --locked
+
+FROM chef AS planner
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM chef AS dependencies
+COPY --from=planner /build/recipe.json recipe.json
+RUN cargo chef cook --release --locked --recipe-path recipe.json \
+        --package waxdemon-server --bin waxdemon
+RUN cargo chef cook --release --locked --recipe-path recipe.json \
+        --package waxdemon-app --target wasm32-unknown-unknown \
+        --target-dir target/front --no-default-features --features hydrate
+
+FROM dependencies AS builder
 COPY . .
 RUN cargo leptos build --release --lib-cargo-args=--locked --bin-cargo-args=--locked
 
