@@ -110,7 +110,7 @@ pub(super) async fn render(
     let options = state.leptos.clone();
     let nonce = Nonce::new();
     let policy = format!(
-        "default-src 'self'; script-src 'self' 'nonce-{nonce}' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' https://i.discogs.com https://img.discogs.com https://api-img.discogs.com data:; connect-src 'self'; form-action 'self' https://www.discogs.com/oauth/authorize; frame-ancestors 'none'; base-uri 'none'"
+        "default-src 'self'; object-src 'none'; script-src 'self' 'nonce-{nonce}' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' https://i.discogs.com https://img.discogs.com https://api-img.discogs.com data:; connect-src 'self'; form-action 'self' https://www.discogs.com/oauth/authorize; frame-ancestors 'none'; base-uri 'none'"
     );
     let context = bootstrap.clone();
     let handler = leptos_axum::render_app_to_stream_with_context(

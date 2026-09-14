@@ -1,5 +1,5 @@
 use super::{
-    AuthError, AuthSession, AuthState, SESSION_DAYS,
+    AuthError, AuthSession, AuthState,
     backend::{LoginCredentials, User},
     store::{PgSessionStore, hash},
 };
@@ -81,6 +81,10 @@ pub fn router(state: AuthState) -> Router {
         .layer(DefaultBodyLimit::max(8192))
         .layer(middleware::from_fn(enforce_deadline))
         .layer(auth)
+        .layer(middleware::from_fn_with_state(
+            super::limits::RequestLimits::default(),
+            super::limits::enforce,
+        ))
         .layer(middleware::from_fn(security_headers))
         .layer(tower_http::compression::CompressionLayer::new())
         .with_state(state)
@@ -89,6 +93,10 @@ pub fn router(state: AuthState) -> Router {
 async fn security_headers(request: Request, next: Next) -> Response {
     let mut response = next.run(request).await;
     let headers = response.headers_mut();
+    headers.insert(
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=()".parse().unwrap(),
+    );
     headers.insert(header::CACHE_CONTROL, "no-store".parse().unwrap());
     headers
         .entry(header::REFERRER_POLICY)
@@ -274,7 +282,7 @@ async fn callback(
         .ok_or(AuthError::Forbidden)?;
     auth.session.flush().await?;
     auth.session.cycle_id().await?;
-    let deadline = OffsetDateTime::now_utc() + Duration::days(SESSION_DAYS);
+    let deadline = OffsetDateTime::now_utc() + Duration::days(state.session_days);
     auth.session.set_expiry(Some(Expiry::AtDateTime(deadline)));
     auth.session
         .insert(DEADLINE_KEY, deadline.unix_timestamp())

@@ -38,7 +38,16 @@ pub async fn from_env(pool: sqlx::PgPool) -> anyhow::Result<AuthState> {
         Arc::new(vault),
         &public_url,
     )?;
+    let session_days = match std::env::var("SESSION_DAYS") {
+        Ok(value) => value
+            .parse::<i64>()
+            .map_err(|_| anyhow::anyhow!("SESSION_DAYS must be an integer from 1 to 365"))?,
+        Err(std::env::VarError::NotPresent) => super::SESSION_DAYS,
+        Err(_) => anyhow::bail!("SESSION_DAYS must be an integer from 1 to 365"),
+    };
     state
+        .with_session_days(session_days)
+        .map_err(|_| anyhow::anyhow!("SESSION_DAYS must be an integer from 1 to 365"))?
         .with_legacy_owner(std::env::var("DISCOGS_USERNAME").ok())
         .await
 }
