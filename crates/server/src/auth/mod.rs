@@ -33,6 +33,7 @@ pub struct AuthState {
     pub(super) callback: String,
     pub(super) secure: bool,
     pub(super) session_days: i64,
+    pub(super) trusted_proxies: axum_client_addr::ClientIpConfig,
 }
 
 impl AuthState {
@@ -76,7 +77,26 @@ impl AuthState {
                 .to_string(),
             secure: url.scheme() == "https",
             session_days: SESSION_DAYS,
+            trusted_proxies: axum_client_addr::ClientIpConfig::default(),
         })
+    }
+
+    pub fn with_trusted_proxies(mut self, proxies: &str) -> Result<Self, AuthError> {
+        use axum_client_addr::{ChainHeader, ClientIpConfig, IpCidr};
+        let mut config = ClientIpConfig::builder()
+            .trusted_proxies()
+            .chain_header_order([ChainHeader::x_forwarded_for()]);
+        if !proxies.trim().is_empty() {
+            for proxy in proxies.split(',') {
+                let cidr = proxy
+                    .trim()
+                    .parse::<IpCidr>()
+                    .map_err(|_| AuthError::Configuration)?;
+                config = config.proxy(cidr);
+            }
+        }
+        self.trusted_proxies = config.build().map_err(|_| AuthError::Configuration)?;
+        Ok(self)
     }
 
     pub fn with_session_days(mut self, days: i64) -> Result<Self, AuthError> {

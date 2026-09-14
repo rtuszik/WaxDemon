@@ -129,6 +129,7 @@ affinity: {}
 config:
     PUBLIC_URL: ""
     SESSION_DAYS: "90"
+    TRUSTED_PROXIES: ""
     DISCOGS_USERNAME: ""
     OAUTH_ACTIVE_KEY_ID: primary
     OAUTH_KEYRING_FILE: /var/run/secrets/waxdemon/keyring.json

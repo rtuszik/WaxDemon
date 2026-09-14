@@ -299,7 +299,12 @@ async fn browser_hydration_library_settings_and_chart_lifecycle() {
         .unwrap()
         .router();
     let server = tokio::spawn(async move {
-        axum::serve(listener, app).await.unwrap();
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
     });
     let driver = webdriver::Driver::start().await;
     driver.goto(&format!("{origin}/auth/login")).await;
@@ -1508,7 +1513,13 @@ impl Browser {
         body: &str,
         origin: Option<&str>,
     ) -> (StatusCode, HeaderMap, String) {
-        let mut builder = Request::builder().method(method).uri(uri);
+        let mut builder =
+            Request::builder()
+                .method(method)
+                .uri(uri)
+                .extension(axum::extract::ConnectInfo(
+                    "127.0.0.1:12345".parse::<std::net::SocketAddr>().unwrap(),
+                ));
         if let Some(cookie) = &self.cookie {
             builder = builder.header("cookie", cookie);
         }
@@ -2075,5 +2086,56 @@ async fn configured_session_lifetime_sets_cookie_and_persisted_deadline() {
     .await
     .unwrap();
     assert_eq!(stored, deadline);
+    cleanup(pool, admin, schema).await;
+}
+
+#[tokio::test]
+async fn dashboard_limits_are_user_scoped_across_routes_on_one_router() {
+    let (pool, admin, schema) = database().await;
+    let server = MockServer::start().await;
+    let app = auth_state(&pool, &server).router();
+    let mut alice = Browser {
+        app: app.clone(),
+        cookie: None,
+    };
+    let mut bob = Browser {
+        app: app.clone(),
+        cookie: None,
+    };
+    provider(&server, 41).await;
+    alice.login().await;
+    provider(&server, 42).await;
+    bob.login().await;
+    sqlx::query("UPDATE users SET status='approved'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let mut anonymous = Browser { app, cookie: None };
+    for _ in 0..130 {
+        assert_eq!(
+            anonymous.request("GET", "/api/dashboard", "", None).await.0,
+            StatusCode::UNAUTHORIZED
+        );
+    }
+    for _ in 0..30 {
+        assert_eq!(
+            alice.request("GET", "/api/dashboard", "", None).await.0,
+            StatusCode::OK
+        );
+    }
+    for route in ["/", "/api/dashboard?range=1m"] {
+        assert_eq!(
+            alice.request("HEAD", route, "", None).await.0,
+            StatusCode::TOO_MANY_REQUESTS
+        );
+    }
+    assert_eq!(
+        bob.request("GET", "/api/dashboard", "", None).await.0,
+        StatusCode::OK
+    );
+    assert_eq!(
+        alice.request("GET", "/health/live", "", None).await.0,
+        StatusCode::NO_CONTENT
+    );
     cleanup(pool, admin, schema).await;
 }
