@@ -45,7 +45,14 @@ pub async fn from_env(pool: sqlx::PgPool) -> anyhow::Result<AuthState> {
         Err(std::env::VarError::NotPresent) => super::SESSION_DAYS,
         Err(_) => anyhow::bail!("SESSION_DAYS must be an integer from 1 to 365"),
     };
+    let trusted_proxies = match std::env::var("TRUSTED_PROXIES") {
+        Ok(value) => value,
+        Err(std::env::VarError::NotPresent) => String::new(),
+        Err(_) => anyhow::bail!("TRUSTED_PROXIES must contain comma-separated IP networks"),
+    };
     state
+        .with_trusted_proxies(&trusted_proxies)
+        .map_err(|_| anyhow::anyhow!("TRUSTED_PROXIES must contain comma-separated IP networks"))?
         .with_session_days(session_days)
         .map_err(|_| anyhow::anyhow!("SESSION_DAYS must be an integer from 1 to 365"))?
         .with_legacy_owner(std::env::var("DISCOGS_USERNAME").ok())

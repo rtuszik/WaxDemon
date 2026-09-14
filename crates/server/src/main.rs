@@ -29,7 +29,7 @@ async fn main() -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(&cfg.bind_addr).await?;
     tracing::info!(%cfg.bind_addr, "listening");
     tokio::select! {
-        result = axum::serve(listener, auth.clone().router()).into_future() => result?,
+        result = axum::serve(listener, auth.clone().router().into_make_service_with_connect_info::<std::net::SocketAddr>()).into_future() => result?,
         result = waxdemon_server::jobs::run(auth) => result?,
     }
     Ok(())

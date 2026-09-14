@@ -109,12 +109,15 @@ async fn redirects_errors_and_preflights_keep_security_headers_without_cors() {
 #[tokio::test]
 async fn throttled_requests_keep_headers_and_do_not_block_health_checks() {
     let app = state("https://wax.example").unwrap().router();
-    for _ in 0..30 {
+    for _ in 0..10 {
         let response = app
             .clone()
             .oneshot(
                 Request::builder()
                     .uri("/auth/callback")
+                    .extension(axum::extract::ConnectInfo(
+                        "192.0.2.1:12345".parse::<std::net::SocketAddr>().unwrap(),
+                    ))
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -127,6 +130,9 @@ async fn throttled_requests_keep_headers_and_do_not_block_health_checks() {
         .oneshot(
             Request::builder()
                 .uri("/auth/callback")
+                .extension(axum::extract::ConnectInfo(
+                    "192.0.2.1:12345".parse::<std::net::SocketAddr>().unwrap(),
+                ))
                 .header("x-forwarded-for", "203.0.113.1")
                 .body(Body::empty())
                 .unwrap(),
@@ -138,6 +144,32 @@ async fn throttled_requests_keep_headers_and_do_not_block_health_checks() {
     assert_eq!(response.headers()["cache-control"], "no-store");
     assert_eq!(response.headers()["x-content-type-options"], "nosniff");
     assert!(response.headers().contains_key("permissions-policy"));
+    for peer in [
+        "192.0.2.1:54321",
+        "[::ffff:192.0.2.1]:12345",
+        "192.0.2.2:12345",
+    ] {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/auth/callback")
+                    .extension(axum::extract::ConnectInfo(
+                        peer.parse::<std::net::SocketAddr>().unwrap(),
+                    ))
+                    .header("forwarded", "for=198.51.100.1")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let expected = if peer.starts_with("192.0.2.2:") {
+            StatusCode::BAD_REQUEST
+        } else {
+            StatusCode::TOO_MANY_REQUESTS
+        };
+        assert_eq!(response.status(), expected, "{peer}");
+    }
     let response = app
         .oneshot(
             Request::builder()
@@ -148,4 +180,185 @@ async fn throttled_requests_keep_headers_and_do_not_block_health_checks() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::NO_CONTENT);
+}
+
+#[tokio::test]
+async fn oauth_requires_transport_identity_and_real_server_supplies_it() {
+    let app = state("https://wax.example").unwrap().router();
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/auth/callback")
+                .header("x-forwarded-for", "192.0.2.1")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let server = tokio::spawn(async move {
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
+    });
+    let client = reqwest::Client::new();
+    for index in 0..11 {
+        let response = client
+            .get(format!("http://{address}/auth/callback"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(
+            response.status().as_u16(),
+            if index < 10 { 400 } else { 429 }
+        );
+    }
+    server.abort();
+    let _ = server.await;
+}
+
+#[tokio::test]
+async fn trusted_proxy_separates_clients_and_ignores_spoofed_prefixes() {
+    let app = state("https://wax.example")
+        .unwrap()
+        .with_trusted_proxies("192.0.2.0/24")
+        .unwrap()
+        .router();
+    for index in 0..40 {
+        let request = Request::builder()
+            .uri("/auth/callback")
+            .extension(axum::extract::ConnectInfo(
+                "192.0.2.100:12345".parse::<std::net::SocketAddr>().unwrap(),
+            ))
+            .header(
+                "x-forwarded-for",
+                format!("198.51.100.{index}, 203.0.113.1"),
+            )
+            .body(Body::empty())
+            .unwrap();
+        let response = app.clone().oneshot(request).await.unwrap();
+        assert_eq!(
+            response.status(),
+            if index < 10 {
+                StatusCode::BAD_REQUEST
+            } else {
+                StatusCode::TOO_MANY_REQUESTS
+            }
+        );
+    }
+    let request = Request::builder()
+        .uri("/auth/callback")
+        .extension(axum::extract::ConnectInfo(
+            "192.0.2.100:12345".parse::<std::net::SocketAddr>().unwrap(),
+        ))
+        .header("x-forwarded-for", "203.0.113.2")
+        .body(Body::empty())
+        .unwrap();
+    assert_eq!(
+        app.clone().oneshot(request).await.unwrap().status(),
+        StatusCode::BAD_REQUEST
+    );
+    for header in [None, Some("invalid"), Some("192.0.2.100")] {
+        let mut request =
+            Request::builder()
+                .uri("/auth/callback")
+                .extension(axum::extract::ConnectInfo(
+                    "192.0.2.100:12345".parse::<std::net::SocketAddr>().unwrap(),
+                ));
+        if let Some(value) = header {
+            request = request.header("x-forwarded-for", value);
+        }
+        assert_eq!(
+            app.clone()
+                .oneshot(request.body(Body::empty()).unwrap())
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+    }
+}
+
+#[tokio::test]
+async fn cidr_proxy_config_validates_networks_and_rejects_unusable_chains() {
+    for proxies in [
+        "not-a-network",
+        "192.0.2.0/33",
+        "2001:db8::/129",
+        "192.0.2.0/24,",
+    ] {
+        assert!(
+            state("https://wax.example")
+                .unwrap()
+                .with_trusted_proxies(proxies)
+                .is_err(),
+            "{proxies}"
+        );
+    }
+    let app = state("https://wax.example")
+        .unwrap()
+        .with_trusted_proxies("192.0.2.0/24,2001:db8::/64")
+        .unwrap()
+        .router();
+    for (peer, xff, expected) in [
+        (
+            "192.0.2.201:1234",
+            Some("198.51.100.1, 203.0.113.1, 192.0.2.202"),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            "[::ffff:192.0.2.202]:1234",
+            Some("203.0.113.2"),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            "[2001:db8::1]:1234",
+            Some("[2001:db8:1::1]:4321"),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            "192.0.2.1:1234",
+            Some("203.0.113.1, unknown"),
+            StatusCode::SERVICE_UNAVAILABLE,
+        ),
+        ("192.0.2.1:1234", None, StatusCode::SERVICE_UNAVAILABLE),
+    ] {
+        let mut request = Request::builder()
+            .uri("/auth/callback")
+            .extension(axum::extract::ConnectInfo(
+                peer.parse::<std::net::SocketAddr>().unwrap(),
+            ))
+            .header("forwarded", "for=198.51.100.99;proto=\", for=203.0.113.10");
+        if let Some(xff) = xff {
+            request = request.header("x-forwarded-for", xff);
+        }
+        assert_eq!(
+            app.clone()
+                .oneshot(request.body(Body::empty()).unwrap())
+                .await
+                .unwrap()
+                .status(),
+            expected,
+            "{peer} {xff:?}"
+        );
+    }
+    let request = Request::builder()
+        .uri("/auth/callback")
+        .extension(axum::extract::ConnectInfo(
+            "192.0.2.1:1234".parse::<std::net::SocketAddr>().unwrap(),
+        ))
+        .header("x-forwarded-for", "198.51.100.99")
+        .header("x-forwarded-for", "203.0.113.3")
+        .body(Body::empty())
+        .unwrap();
+    assert_eq!(
+        app.oneshot(request).await.unwrap().status(),
+        StatusCode::BAD_REQUEST
+    );
 }

@@ -28,6 +28,8 @@ const DEADLINE_KEY: &str = "auth_expires";
 
 pub fn router(state: AuthState) -> Router {
     let _ = any_spawner::Executor::init_tokio();
+    let limits =
+        super::limits::RequestLimits::default().with_trusted_proxies(state.trusted_proxies.clone());
     let store = PgSessionStore::new(state.pool.clone());
     let sessions = SessionManagerLayer::new(store)
         .with_name(if state.secure {
@@ -80,11 +82,12 @@ pub fn router(state: AuthState) -> Router {
         .route("/admin/users/{id}/reject", post(reject))
         .layer(DefaultBodyLimit::max(8192))
         .layer(middleware::from_fn(enforce_deadline))
-        .layer(auth)
         .layer(middleware::from_fn_with_state(
-            super::limits::RequestLimits::default(),
-            super::limits::enforce,
+            limits.clone(),
+            super::limits::dashboard,
         ))
+        .layer(auth)
+        .layer(middleware::from_fn_with_state(limits, super::limits::oauth))
         .layer(middleware::from_fn(security_headers))
         .layer(tower_http::compression::CompressionLayer::new())
         .with_state(state)
