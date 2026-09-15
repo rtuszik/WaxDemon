@@ -2,8 +2,6 @@
 
 Self-hosted dashboard for your Discogs collection. Tracks collection value over time and other statistics over time.
 
-Per-user collections with Discogs OAuth; other users require administrator approval.
-
 > [!WARNING]
 > This project is significantly AI-Supported.
 > Assume there are bugs, rough edges, missing validation, and incorrect assumptions.
@@ -19,8 +17,7 @@ In production prefer a pre-existing Secret managed by your secrets stack:
 helm install waxdemon oci://ghcr.io/rtuszik/waxdemon/waxdemon \
   --version 1.6.0 \
   --set secrets.existingSecret=waxdemon-secrets \
-  --set config.PUBLIC_URL='https://waxdemon.example.com' \
-  --set config.DISCOGS_USERNAME='your_handle'
+  --set config.PUBLIC_URL='https://waxdemon.example.com'
 ```
 
 The Secret must contain keys `DATABASE_URL`, `DISCOGS_CONSUMER_KEY`,
@@ -33,7 +30,8 @@ The Secret must contain keys `DATABASE_URL`, `DISCOGS_CONSUMER_KEY`,
 cp .env.example .env
 ```
 
-Fill in `.env` and create the keyring at `OAUTH_KEYRING_SOURCE`, then run
+Fill in `.env`, setting a database password and a matching `DATABASE_URL` using
+`postgres:5432`. Create the keyring at `OAUTH_KEYRING_SOURCE`, then run
 `docker compose up -d`.
 
 ## Running from source
@@ -47,18 +45,19 @@ cargo run --release -p waxdemon-server
 
 Config is done via environment variables:
 
-| Var                                               | Required                | Purpose                                               |
-| ------------------------------------------------- | ----------------------- | ----------------------------------------------------- |
-| `DATABASE_URL`                                    | yes                     | Postgres connection string                            |
-| `PUBLIC_URL`                                      | yes                     | Public origin; OAuth callback is `/auth/callback`     |
-| `DISCOGS_CONSUMER_KEY`, `DISCOGS_CONSUMER_SECRET` | yes                     | Discogs application credentials                       |
-| `DISCOGS_USERNAME`                                | until first owner login | Administrator's Discogs handle                        |
-| `OAUTH_ACTIVE_KEY_ID`                             | yes                     | Active keyring ID (`primary` in Helm/Compose)         |
-| `OAUTH_KEYRING_FILE`                              | yes                     | Keyring JSON file path                                |
-| `BIND_ADDR`                                       | no                      | Where the HTTP server listens; default `0.0.0.0:3000` |
+| Var                                               | Required              | Purpose                                               |
+| ------------------------------------------------- | --------------------- | ----------------------------------------------------- |
+| `DATABASE_URL`                                    | yes                   | Postgres connection string                            |
+| `PUBLIC_URL`                                      | yes                   | Public origin; OAuth callback is `/auth/callback`     |
+| `DISCOGS_CONSUMER_KEY`, `DISCOGS_CONSUMER_SECRET` | yes                   | Discogs application credentials                       |
+| `DISCOGS_USERNAME`                                | legacy migration only | Existing collection owner's Discogs handle            |
+| `OAUTH_ACTIVE_KEY_ID`                             | yes                   | Active keyring ID (`primary` in Helm/Compose)         |
+| `OAUTH_KEYRING_FILE`                              | yes                   | Keyring JSON file path                                |
+| `BIND_ADDR`                                       | no                    | Where the HTTP server listens; default `0.0.0.0:3000` |
 
 Keyring JSON (64-character hex keys): `{"primary":"<openssl rand -hex 32 output>"}`.
-Set per-user sync intervals in Settings.
+The first Discogs signup on a fresh installation becomes the administrator. Later
+signups require administrator approval. Set per-user sync intervals in Settings.
 
 ## Upgrading to 1.0.0
 
