@@ -45,7 +45,7 @@ impl AuthnBackend for AuthState {
         let mut tx = self.pool.begin().await?;
         let mut imported_legacy = false;
         if credentials.expected_user.is_none()
-            && let Some(owner) = &self.legacy_owner
+            && (self.legacy_owner.is_some() || self.bootstrap_first_user)
         {
             sqlx::query("SELECT pg_advisory_xact_lock(-3)")
                 .execute(&mut *tx)
@@ -55,7 +55,21 @@ impl AuthnBackend for AuthState {
             )
             .fetch_one(&mut *tx)
             .await?;
-            if !initialized && identity.username.eq_ignore_ascii_case(owner) {
+            if !initialized && self.bootstrap_first_user {
+                sqlx::query(
+                    "INSERT INTO users (discogs_id, username, role, status)
+                     SELECT $1, $2, 'admin', 'approved' WHERE NOT EXISTS(SELECT 1 FROM users)",
+                )
+                .bind(identity.id)
+                .bind(&identity.username)
+                .execute(&mut *tx)
+                .await?;
+            } else if !initialized
+                && self
+                    .legacy_owner
+                    .as_ref()
+                    .is_some_and(|owner| identity.username.eq_ignore_ascii_case(owner))
+            {
                 waxdemon_db::legacy_import::import_legacy_for_oauth(
                     &mut tx,
                     identity.id,

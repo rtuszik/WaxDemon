@@ -28,6 +28,7 @@ pub struct AuthState {
     pub(crate) oauth: OAuthClient,
     pub(crate) vault: Arc<CredentialVault>,
     pub(crate) legacy_owner: Option<String>,
+    pub(crate) bootstrap_first_user: bool,
     pub(crate) leptos: leptos::prelude::LeptosOptions,
     pub(super) origin: String,
     pub(super) callback: String,
@@ -64,6 +65,7 @@ impl AuthState {
             oauth,
             vault,
             legacy_owner: None,
+            bootstrap_first_user: false,
             leptos: leptos::prelude::LeptosOptions::builder()
                 .output_name("waxdemon")
                 .site_root(
@@ -124,8 +126,21 @@ impl AuthState {
                 "unimported legacy data exists alongside an administrator; refusing to reassign it"
             );
         } else {
-            self.legacy_owner = Some(username.filter(|name| !name.trim().is_empty())
-                .ok_or_else(|| anyhow::anyhow!("DISCOGS_USERNAME is required until the owner completes their first OAuth login"))?);
+            self.legacy_owner = username.filter(|name| !name.trim().is_empty());
+            if self.legacy_owner.is_none() {
+                anyhow::ensure!(
+                    !waxdemon_db::legacy_import::has_legacy_data(&self.pool).await?,
+                    "DISCOGS_USERNAME is required until the legacy owner completes their first OAuth login"
+                );
+                let users_exist: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM users)")
+                    .fetch_one(&self.pool)
+                    .await?;
+                anyhow::ensure!(
+                    !users_exist,
+                    "an approved administrator is required for an existing installation"
+                );
+                self.bootstrap_first_user = true;
+            }
         }
         Ok(self)
     }
