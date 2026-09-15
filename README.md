@@ -33,8 +33,9 @@ cp .env.example .env
 ```
 
 Fill in `.env`, setting a database password and a matching `DATABASE_URL` using
-`postgres:5432`. Create the keyring at `OAUTH_KEYRING_SOURCE`, then run
-`docker compose up -d`.
+`postgres:5432`. Create the keyring at the host path in `OAUTH_KEYRING_SOURCE`.
+Compose mounts it at `/run/secrets/oauth-keyring.json` inside the container,
+which is the `OAUTH_KEYRING_FILE` value. Then run `docker compose up -d`.
 
 ## Config
 
