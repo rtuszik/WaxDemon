@@ -1182,7 +1182,6 @@ pub fn Approvals() -> impl IntoView {
         <div class="page-heading">
             <div>
                 <h1>"Pending accounts"</h1>
-                <p class="muted">"Approval queues the initial collection sync."</p>
             </div>
         </div>
         <Status remote=data />
