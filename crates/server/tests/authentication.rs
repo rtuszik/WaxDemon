@@ -190,12 +190,6 @@ async fn concurrent_owner_logins_bootstrap_an_empty_database_only_once() {
     use waxdemon_server::auth::backend::LoginCredentials;
     let (pool, admin, schema) = database().await;
     let server = MockServer::start().await;
-    assert!(
-        auth_state(&pool, &server)
-            .with_legacy_owner(None)
-            .await
-            .is_err()
-    );
     provider(&server, 123).await;
     let state = auth_state(&pool, &server)
         .with_legacy_owner(Some("owner-123".into()))
@@ -243,6 +237,148 @@ async fn concurrent_owner_logins_bootstrap_an_empty_database_only_once() {
             .await
             .is_err()
     );
+    cleanup(pool, admin, schema).await;
+}
+
+#[tokio::test]
+async fn fresh_install_bootstraps_one_admin_across_concurrent_signups() {
+    use axum_login::AuthnBackend;
+    use waxdemon_server::auth::backend::LoginCredentials;
+    let (pool, admin, schema) = database().await;
+    let first_provider = MockServer::start().await;
+    let second_provider = MockServer::start().await;
+    provider(&first_provider, 123).await;
+    provider(&second_provider, 456).await;
+    let first_state = auth_state(&pool, &first_provider)
+        .with_legacy_owner(None)
+        .await
+        .unwrap();
+    let second_state = auth_state(&pool, &second_provider)
+        .with_legacy_owner(Some("  ".into()))
+        .await
+        .unwrap();
+    let credentials = || LoginCredentials {
+        access: OAuthCredentials::new("token".into(), "secret".into()).unwrap(),
+        expected_user: None,
+    };
+    let (first, second) = tokio::join!(
+        first_state.authenticate(credentials()),
+        second_state.authenticate(credentials())
+    );
+    let users = [first.unwrap().unwrap(), second.unwrap().unwrap()];
+    assert_ne!(users[0].id, users[1].id);
+    assert_eq!(
+        users
+            .iter()
+            .filter(|u| u.role == "admin" && u.status == "approved")
+            .count(),
+        1
+    );
+    assert_eq!(
+        users
+            .iter()
+            .filter(|u| u.role == "user" && u.status == "pending")
+            .count(),
+        1
+    );
+    let jobs: i64 = sqlx::query_scalar("SELECT count(*) FROM user_sync_runs WHERE status='queued'")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(jobs, 1);
+    let restarted = auth_state(&pool, &second_provider)
+        .with_legacy_owner(None)
+        .await
+        .unwrap();
+    let returning = restarted
+        .authenticate(credentials())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(returning.role, users[1].role);
+    assert_eq!(returning.status, users[1].status);
+    sqlx::query("UPDATE users SET role='user', status='pending'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        first_state
+            .authenticate(credentials())
+            .await
+            .unwrap()
+            .unwrap()
+            .role,
+        "user"
+    );
+    assert!(
+        auth_state(&pool, &first_provider)
+            .with_legacy_owner(None)
+            .await
+            .is_err()
+    );
+    cleanup(pool, admin, schema).await;
+}
+
+#[tokio::test]
+async fn failed_fresh_signup_leaves_admin_bootstrap_available() {
+    let (pool, admin, schema) = database().await;
+    let server = MockServer::start().await;
+    provider(&server, 123).await;
+    let state = auth_state(&pool, &server)
+        .with_legacy_owner(None)
+        .await
+        .unwrap();
+    sqlx::query(
+        "ALTER TABLE discogs_connections ADD CONSTRAINT reject_credentials CHECK (user_id < 0)",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    let mut first = Browser {
+        app: state.clone().router(),
+        cookie: None,
+    };
+    let (callback, _) = first.start().await;
+    assert_eq!(
+        first.request("GET", &callback, "", None).await.0,
+        StatusCode::BAD_GATEWAY
+    );
+    let users: i64 = sqlx::query_scalar("SELECT count(*) FROM users")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(users, 0);
+    sqlx::query("ALTER TABLE discogs_connections DROP CONSTRAINT reject_credentials")
+        .execute(&pool)
+        .await
+        .unwrap();
+    provider(&server, 456).await;
+    let mut second = Browser {
+        app: state.router(),
+        cookie: None,
+    };
+    second.login().await;
+    let me = second.me().await;
+    assert_eq!(me["user"]["role"], "admin");
+    assert_eq!(me["user"]["status"], "approved");
+    cleanup(pool, admin, schema).await;
+}
+
+#[tokio::test]
+async fn legacy_data_requires_an_owner_before_signup() {
+    let (pool, admin, schema) = database_with_legacy(
+        "INSERT INTO collection_items (id, release_id, added_date) VALUES (10, 42, '2025-01-01');",
+    )
+    .await;
+    let server = MockServer::start().await;
+    for username in [None, Some("  ".into())] {
+        assert!(
+            auth_state(&pool, &server)
+                .with_legacy_owner(username)
+                .await
+                .is_err()
+        );
+    }
     cleanup(pool, admin, schema).await;
 }
 
