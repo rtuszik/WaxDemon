@@ -2,6 +2,21 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.7.0](https://github.com/rtuszik/WaxDemon/compare/f7913279243d80bf94a1ba2edfdc967d722fe067..v1.7.0) - 2026-09-15
+#### Features
+- (**auth**) bootstrap first user as approved admin on fresh installs - ([8481522](https://github.com/rtuszik/WaxDemon/commit/84815226776695f852238135fd2ca8a97eb72bbc)) - [@rtuszik](https://github.com/rtuszik)
+#### Documentation
+- clarify OAuth keyring Docker mount configuration - ([d52a95f](https://github.com/rtuszik/WaxDemon/commit/d52a95f2da7d6b63f45c12d061362ceb5bef5080)) - [@rtuszik](https://github.com/rtuszik)
+- update setup and authentication documentation - ([59742eb](https://github.com/rtuszik/WaxDemon/commit/59742eb62be340e000fa6385ba023ab4b880e001)) - [@rtuszik](https://github.com/rtuszik)
+#### Build system
+- rename Docker Compose configuration and update documentation - ([6dc09df](https://github.com/rtuszik/WaxDemon/commit/6dc09df476ce68d7de6d7433e9aee375d10279e5)) - [@rtuszik](https://github.com/rtuszik)
+#### Refactoring
+- (**app**) move sync panel to settings page header - ([99668f2](https://github.com/rtuszik/WaxDemon/commit/99668f24b88910766c510a2420a7d6e1d6f86263)) - [@rtuszik](https://github.com/rtuszik)
+#### Style
+- remove approval queue description - ([f791327](https://github.com/rtuszik/WaxDemon/commit/f7913279243d80bf94a1ba2edfdc967d722fe067)) - [@rtuszik](https://github.com/rtuszik)
+
+- - -
+
 ## [v1.6.0](https://github.com/rtuszik/WaxDemon/compare/f37837c5e2c1910da234d29584b2f90930315443..v1.6.0) - 2026-09-14
 #### Features
 - (**auth**) add trusted proxy-aware per-identity rate limiting - ([755a8dd](https://github.com/rtuszik/WaxDemon/commit/755a8dde0fb640766a28106de047406b467d7d23)) - [@rtuszik](https://github.com/rtuszik)
