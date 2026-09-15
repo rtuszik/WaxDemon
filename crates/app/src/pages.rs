@@ -59,7 +59,6 @@ fn Dashboard() -> impl IntoView {
         crate::remote::with_query("/api/dashboard", &location.search.get())
     }));
     view! {
-        <SyncPanel />
         <Status remote=data />
         {move || {
             let value = data.data.get();
@@ -994,6 +993,7 @@ pub fn Settings() -> impl IntoView {
         <div class="page-heading">
             <h1>"Settings"</h1>
         </div>
+        <SyncPanel />
         <Status remote=data />
         {move || {
             (!data.data.get().is_null())
@@ -1026,7 +1026,6 @@ pub fn Settings() -> impl IntoView {
                 "Disconnecting removes stored credentials and stops syncs. Revoke the application in Discogs too if you want to remove its upstream authorization."
             </p>
         </section>
-        <SyncPanel />
         <section class="panel">
             <h2>"Sessions"</h2>
             <p>
