@@ -21,6 +21,15 @@ pub struct Bootstrap {
 }
 
 #[component]
+fn SiteFooter() -> impl IntoView {
+    view! {
+        <footer class="site-footer">
+            {concat!("v", env!("CARGO_PKG_VERSION"))}
+        </footer>
+    }
+}
+
+#[component]
 pub fn App() -> impl IntoView {
     leptos_meta::provide_meta_context();
     provide_context(remote::RefreshEpoch(RwSignal::new(0)));
@@ -58,6 +67,7 @@ pub fn App() -> impl IntoView {
                     <Route path=path!("admin/users") view=pages::Approvals/>
                 </Routes>
             </main>
+            <SiteFooter/>
         </Router>
     }
 }
@@ -98,4 +108,16 @@ pub fn hydrate() {
         provide_context(bootstrap.clone());
         view! {<App/>}
     });
+}
+
+#[cfg(all(test, feature = "ssr"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn footer_displays_package_version() {
+        let html = view! { <SiteFooter/> }.to_html();
+
+        assert!(html.contains(concat!("v", env!("CARGO_PKG_VERSION"))));
+    }
 }
