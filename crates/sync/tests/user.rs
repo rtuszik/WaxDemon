@@ -203,7 +203,7 @@ async fn backfills_inferred_counts_once_before_the_first_observed_snapshot_witho
         &server,
         "alice",
         vec![
-            entry_at(100, "Mint (M)", "2025-01-01T10:00:00-05:00"),
+            entry_at(100, "Mint (M)", "2025-01-01T00:30:00+14:00"),
             entry_at(101, "Mint (M)", "2025-01-01T12:00:00-05:00"),
             entry_at(102, "Mint (M)", "2025-01-15T00:00:00Z"),
             entry_at(103, "Mint (M)", "2025-03-01T00:00:00Z"),
@@ -228,6 +228,7 @@ async fn backfills_inferred_counts_once_before_the_first_observed_snapshot_witho
     assert_eq!(
         inferred,
         vec![
+            ("2024-12-31T00:00:00Z".into(), 1, "inferred".into()),
             ("2025-01-01T00:00:00Z".into(), 2, "inferred".into()),
             ("2025-01-15T00:00:00Z".into(), 3, "inferred".into()),
         ]
@@ -263,6 +264,7 @@ async fn backfills_inferred_counts_once_before_the_first_observed_snapshot_witho
     assert_eq!(
         unchanged,
         vec![
+            ("2024-12-31T00:00:00Z".into(), 1),
             ("2025-01-01T00:00:00Z".into(), 2),
             ("2025-01-15T00:00:00Z".into(), 3),
         ]
