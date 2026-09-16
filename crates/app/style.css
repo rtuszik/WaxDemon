@@ -183,6 +183,8 @@ body {
 body {
     min-height: 100vh;
     padding: 24px;
+    display: flex;
+    flex-direction: column;
 }
 a {
     color: #e5e5e5;
@@ -270,8 +272,18 @@ select:focus-visible {
     font-size: 14px;
 }
 main {
+    flex: 1 0 auto;
     width: 100%;
     min-width: 0;
+}
+.site-footer {
+    flex-shrink: 0;
+    margin: 24px -24px -24px;
+    padding: 12px 24px;
+    background: #000;
+    color: #737373;
+    font-size: 12px;
+    text-align: center;
 }
 h1,
 h2,
