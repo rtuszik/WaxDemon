@@ -195,13 +195,19 @@ async fn backfill_history(
     .bind(sync.user_id)
     .fetch_one(&mut *connection)
     .await?;
+    let sync_created_at: DateTime<Utc> =
+        sqlx::query_scalar("SELECT created_at FROM user_sync_runs WHERE id=$1 AND user_id=$2")
+            .bind(sync.run_id)
+            .bind(sync.user_id)
+            .fetch_one(&mut *connection)
+            .await?;
     let timestamps: Vec<_> = history
         .iter()
         .map(|(timestamp, _)| timestamp.clone())
         .collect();
     let totals: Vec<_> = history.iter().map(|(_, total)| *total).collect();
-    sqlx::query("INSERT INTO user_collection_history (user_id,timestamp,total_items,source) SELECT $1,h.timestamp,h.total_items,'inferred' FROM unnest($2::text[],$3::int[]) AS h(timestamp,total_items) WHERE $4::timestamptz IS NULL OR h.timestamp::timestamptz<$4 ON CONFLICT (user_id,timestamp) DO NOTHING")
-        .bind(sync.user_id).bind(timestamps).bind(totals).bind(earliest).execute(&mut *connection).await?;
+    sqlx::query("INSERT INTO user_collection_history (user_id,timestamp,total_items,source) SELECT $1,h.timestamp,h.total_items,'inferred' FROM unnest($2::text[],$3::int[]) AS h(timestamp,total_items) WHERE ($4::timestamptz IS NULL OR h.timestamp::timestamptz<$4) AND (h.timestamp::timestamptz AT TIME ZONE 'UTC')::date < ($5::timestamptz AT TIME ZONE 'UTC')::date ON CONFLICT (user_id,timestamp) DO NOTHING")
+        .bind(sync.user_id).bind(timestamps).bind(totals).bind(earliest).bind(sync_created_at).execute(&mut *connection).await?;
     sqlx::query("UPDATE user_collection_metadata SET history_backfilled_at=now() WHERE user_id=$1")
         .bind(sync.user_id)
         .execute(connection)
