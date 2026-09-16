@@ -2,6 +2,15 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.8.0](https://github.com/rtuszik/WaxDemon/compare/c8a6a71e7c90dc13ae344ed1aa4ba8bb3550b070..v1.8.0) - 2026-09-16
+#### Features
+- (**history**) backfill inferred collection history points - ([c8a6a71](https://github.com/rtuszik/WaxDemon/commit/c8a6a71e7c90dc13ae344ed1aa4ba8bb3550b070)) - [@rtuszik](https://github.com/rtuszik)
+#### Bug Fixes
+- (**sync**) exclude inferred history from sync creation date onward - ([7915f9f](https://github.com/rtuszik/WaxDemon/commit/7915f9f4c329f11890b4c91d61a19f68c4efd1a1)) - [@rtuszik](https://github.com/rtuszik)
+- (**sync**) normalize inferred history dates to UTC - ([9d90ee4](https://github.com/rtuszik/WaxDemon/commit/9d90ee4e4e245ec1b5131f1b8ab6f25e2022f3a3)) - [@rtuszik](https://github.com/rtuszik)
+
+- - -
+
 ## [v1.7.0](https://github.com/rtuszik/WaxDemon/compare/f7913279243d80bf94a1ba2edfdc967d722fe067..v1.7.0) - 2026-09-15
 #### Features
 - (**auth**) bootstrap first user as approved admin on fresh installs - ([8481522](https://github.com/rtuszik/WaxDemon/commit/84815226776695f852238135fd2ca8a97eb72bbc)) - [@rtuszik](https://github.com/rtuszik)
