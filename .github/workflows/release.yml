@@ -73,7 +73,11 @@ jobs:
 
             - name: Install version update tools
               if: steps.plan.outputs.released == 'true'
-              run: mise install --locked rust cargo:cargo-edit
+              uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
+              with:
+                  version: 2026.9.1
+                  install_args: "cocogitto rust cargo:cargo-edit"
+                  env: false
 
             - name: Create version commit and tag
               if: steps.plan.outputs.released == 'true'
