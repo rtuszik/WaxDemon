@@ -122,7 +122,11 @@ async fn user(pool: &PgPool, id: i64, name: &str) -> UserSync {
 }
 
 fn entry(instance: i64, condition: &str) -> Value {
-    json!({"id":42,"instance_id":instance,"folder_id":1,"rating":4,"date_added":"2025-01-01T00:00:00Z",
+    entry_at(instance, condition, "2025-01-01T00:00:00Z")
+}
+
+fn entry_at(instance: i64, condition: &str, date_added: &str) -> Value {
+    json!({"id":42,"instance_id":instance,"folder_id":1,"rating":4,"date_added":date_added,
         "notes":[{"field_id":7,"value":condition},{"field_id":8,"value":"My private note"}],
         "basic_information":{"id":42,"title":"Record","year":2025,"resource_url":"","thumb":"","cover_image":"",
             "formats":[{"name":"Vinyl","qty":"1"}],"labels":[],"artists":[{"id":1,"name":"Artist"}],"genres":["Jazz"],"styles":[]}})
@@ -188,6 +192,85 @@ fn parses_money_without_guessing_dollar_currency_or_decimal_commas() {
 }
 
 #[tokio::test]
+async fn backfills_inferred_counts_once_before_the_first_observed_snapshot_without_extra_requests()
+{
+    let (pool, admin, schema) = database().await;
+    let alice = user(&pool, 11, "alice").await;
+    sqlx::query("INSERT INTO user_collection_history (user_id,timestamp,total_items) VALUES ($1,'2025-02-01T00:00:00Z',9)")
+        .bind(alice.user_id).execute(&pool).await.unwrap();
+    let server = MockServer::start().await;
+    collection(
+        &server,
+        "alice",
+        vec![
+            entry_at(100, "Mint (M)", "2025-01-01T10:00:00-05:00"),
+            entry_at(101, "Mint (M)", "2025-01-01T12:00:00-05:00"),
+            entry_at(102, "Mint (M)", "2025-01-15T00:00:00Z"),
+            entry_at(103, "Mint (M)", "2025-03-01T00:00:00Z"),
+        ],
+        4,
+    )
+    .await;
+    Mock::given(path("/marketplace/price_suggestions/42"))
+        .respond_with(ResponseTemplate::new(403))
+        .mount(&server)
+        .await;
+
+    run(&pool, &client(&server, "alice"), &alice).await.unwrap();
+
+    let inferred: Vec<(String, i32, String)> = sqlx::query_as(
+        "SELECT timestamp,total_items,source FROM user_collection_history WHERE user_id=$1 AND source='inferred' ORDER BY timestamp::timestamptz",
+    )
+    .bind(alice.user_id)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        inferred,
+        vec![
+            ("2025-01-01T00:00:00Z".into(), 2, "inferred".into()),
+            ("2025-01-15T00:00:00Z".into(), 3, "inferred".into()),
+        ]
+    );
+    let observed: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM user_collection_history WHERE user_id=$1 AND source='observed'",
+    )
+    .bind(alice.user_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(observed, 2);
+    let marked: bool = sqlx::query_scalar(
+        "SELECT history_backfilled_at IS NOT NULL FROM user_collection_metadata WHERE user_id=$1",
+    )
+    .bind(alice.user_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert!(marked);
+    assert_eq!(server.received_requests().await.unwrap().len(), 5);
+
+    server.reset().await;
+    collection(&server, "alice", vec![entry(100, "Mint (M)")], 1).await;
+    run(&pool, &client(&server, "alice"), &alice).await.unwrap();
+    let unchanged: Vec<(String, i32)> = sqlx::query_as(
+        "SELECT timestamp,total_items FROM user_collection_history WHERE user_id=$1 AND source='inferred' ORDER BY timestamp::timestamptz",
+    )
+    .bind(alice.user_id)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        unchanged,
+        vec![
+            ("2025-01-01T00:00:00Z".into(), 2),
+            ("2025-01-15T00:00:00Z".into(), 3),
+        ]
+    );
+    cleanup(pool, admin, schema).await;
+}
+
+#[tokio::test]
 async fn isolates_users_preserves_duplicate_copies_and_decimal_currency_and_reuses_prices() {
     let (pool, admin, schema) = database().await;
     let alice = user(&pool, 11, "alice").await;
@@ -232,11 +315,12 @@ async fn isolates_users_preserves_duplicate_copies_and_decimal_currency_and_reus
         .await
         .unwrap();
     assert_eq!(count, 1);
-    let history: Vec<(String, String)> =
-        sqlx::query_as("SELECT value_median::text,currency FROM user_collection_history")
-            .fetch_all(&pool)
-            .await
-            .unwrap();
+    let history: Vec<(String, String)> = sqlx::query_as(
+        "SELECT value_median::text,currency FROM user_collection_history WHERE source='observed'",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
     assert_eq!(history, vec![("20.02".into(), "EUR".into()); 2]);
     cleanup(pool, admin, schema).await;
 }
@@ -296,7 +380,7 @@ async fn currency_changes_warn_and_preserve_history_without_affecting_other_user
         .mount(&server)
         .await;
     run(&pool, &client(&server, "alice"), &alice).await.unwrap();
-    let history: Vec<(String, String)> = sqlx::query_as("SELECT value_median::text,currency FROM user_collection_history WHERE user_id=$1 ORDER BY timestamp::timestamptz")
+    let history: Vec<(String, String)> = sqlx::query_as("SELECT value_median::text,currency FROM user_collection_history WHERE user_id=$1 AND source='observed' ORDER BY timestamp::timestamptz")
         .bind(alice.user_id).fetch_all(&pool).await.unwrap();
     assert_eq!(
         history,
@@ -394,7 +478,7 @@ async fn ambiguous_totals_keep_unknown_currency_and_warn_without_using_price_cur
         .await;
     run(&pool, &client(&server, "alice"), &alice).await.unwrap();
     let history: (String, Option<String>) = sqlx::query_as(
-        "SELECT value_median::text,currency FROM user_collection_history WHERE user_id=$1",
+        "SELECT value_median::text,currency FROM user_collection_history WHERE user_id=$1 AND source='observed'",
     )
     .bind(alice.user_id)
     .fetch_one(&pool)
