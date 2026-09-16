@@ -2,6 +2,16 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.9.0](https://github.com/rtuszik/WaxDemon/compare/e50c9248f0d0c1d7f54b8e37c6d4240dc3935a8d..v1.9.0) - 2026-09-16
+#### Features
+- (**app**) add version footer to the application layout - ([4f48b11](https://github.com/rtuszik/WaxDemon/commit/4f48b11f5a5b8f0a9a9772799cf8c931d9695d98)) - [@rtuszik](https://github.com/rtuszik)
+#### Continuous Integration
+- cache release versioning tools - ([e50c924](https://github.com/rtuszik/WaxDemon/commit/e50c9248f0d0c1d7f54b8e37c6d4240dc3935a8d)) - [@rtuszik](https://github.com/rtuszik)
+#### Refactoring
+- (**app**) use utility classes for footer text styles - ([c88e80d](https://github.com/rtuszik/WaxDemon/commit/c88e80d4539f63f60244afdfd0eebf0836b358e1)) - coderabbitai[bot]
+
+- - -
+
 ## [v1.8.0](https://github.com/rtuszik/WaxDemon/compare/c8a6a71e7c90dc13ae344ed1aa4ba8bb3550b070..v1.8.0) - 2026-09-16
 #### Features
 - (**history**) backfill inferred collection history points - ([c8a6a71](https://github.com/rtuszik/WaxDemon/commit/c8a6a71e7c90dc13ae344ed1aa4ba8bb3550b070)) - [@rtuszik](https://github.com/rtuszik)
