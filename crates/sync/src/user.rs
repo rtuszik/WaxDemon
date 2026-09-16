@@ -165,7 +165,9 @@ fn inferred_history(entries: &[Entry]) -> anyhow::Result<Vec<(String, i32)>> {
     for entry in entries {
         let added = DateTime::parse_from_rfc3339(&entry.release.date_added)
             .context("invalid collection date added")?;
-        *additions.entry(added.date_naive()).or_insert(0_i32) += 1;
+        *additions
+            .entry(added.with_timezone(&Utc).date_naive())
+            .or_insert(0_i32) += 1;
     }
     let mut total = 0_i32;
     Ok(additions
