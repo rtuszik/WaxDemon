@@ -154,6 +154,18 @@ fn Dashboard() -> impl IntoView {
                     ))
                     label="Collection size with zoom and pan"
                 />
+                {move || {
+                    data
+                        .data
+                        .get()["history"]
+                        .as_array()
+                        .is_some_and(|history| history.iter().any(|point| point["source"] == "inferred"))
+                        .then_some(view! {
+                            <small class="muted">
+                                "Earlier points are inferred from Discogs date added and exclude records removed before the first sync."
+                            </small>
+                        })
+                }}
             </section>
         </div>
         {move || {

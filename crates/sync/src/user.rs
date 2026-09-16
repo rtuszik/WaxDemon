@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
 use serde_json::Value;
 use sqlx::{Connection, PgConnection, PgPool};
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use waxdemon_discogs::{
     Client,
     collection::{Entry, Page, Suggestions},
@@ -160,6 +160,53 @@ async fn fetch_entries(
     }
 }
 
+fn inferred_history(entries: &[Entry]) -> anyhow::Result<Vec<(String, i32)>> {
+    let mut additions = BTreeMap::new();
+    for entry in entries {
+        let added = DateTime::parse_from_rfc3339(&entry.release.date_added)
+            .context("invalid collection date added")?;
+        *additions.entry(added.date_naive()).or_insert(0_i32) += 1;
+    }
+    let mut total = 0_i32;
+    Ok(additions
+        .into_iter()
+        .map(|(date, count)| {
+            total += count;
+            (format!("{date}T00:00:00Z"), total)
+        })
+        .collect())
+}
+
+async fn backfill_history(
+    connection: &mut PgConnection,
+    sync: &UserSync,
+    history: &[(String, i32)],
+) -> anyhow::Result<()> {
+    let completed: bool = sqlx::query_scalar("SELECT history_backfilled_at IS NOT NULL FROM user_collection_metadata WHERE user_id=$1 FOR UPDATE")
+        .bind(sync.user_id).fetch_one(&mut *connection).await?;
+    if completed {
+        return Ok(());
+    }
+    let earliest: Option<DateTime<Utc>> = sqlx::query_scalar(
+        "SELECT min(timestamp::timestamptz) FROM user_collection_history WHERE user_id=$1 AND source='observed'",
+    )
+    .bind(sync.user_id)
+    .fetch_one(&mut *connection)
+    .await?;
+    let timestamps: Vec<_> = history
+        .iter()
+        .map(|(timestamp, _)| timestamp.clone())
+        .collect();
+    let totals: Vec<_> = history.iter().map(|(_, total)| *total).collect();
+    sqlx::query("INSERT INTO user_collection_history (user_id,timestamp,total_items,source) SELECT $1,h.timestamp,h.total_items,'inferred' FROM unnest($2::text[],$3::int[]) AS h(timestamp,total_items) WHERE $4::timestamptz IS NULL OR h.timestamp::timestamptz<$4 ON CONFLICT (user_id,timestamp) DO NOTHING")
+        .bind(sync.user_id).bind(timestamps).bind(totals).bind(earliest).execute(&mut *connection).await?;
+    sqlx::query("UPDATE user_collection_metadata SET history_backfilled_at=now() WHERE user_id=$1")
+        .bind(sync.user_id)
+        .execute(connection)
+        .await?;
+    Ok(())
+}
+
 pub async fn run(pool: &PgPool, client: &Client, sync: &UserSync) -> anyhow::Result<usize> {
     let mut connection = pool.acquire().await?.detach();
     let locked: bool = sqlx::query_scalar("SELECT pg_try_advisory_lock($1)")
@@ -178,6 +225,7 @@ pub async fn run_locked(
     sync: &UserSync,
 ) -> anyhow::Result<usize> {
     let mut entries = fetch_entries(connection, client, sync).await?;
+    let inferred_history = inferred_history(&entries)?;
     check_access(connection, sync).await?;
     let fields: Value = client
         .request_json(&endpoint(&sync.username, "/collection/fields"))
@@ -264,6 +312,7 @@ pub async fn run_locked(
     .await?;
     sqlx::query("INSERT INTO user_collection_metadata (user_id, fields, folders) VALUES ($1,$2,$3) ON CONFLICT (user_id) DO UPDATE SET fields=EXCLUDED.fields, folders=EXCLUDED.folders, updated_at=now()")
         .bind(sync.user_id).bind(fields).bind(folders).execute(&mut *tx).await?;
+    backfill_history(&mut tx, sync, &inferred_history).await?;
     let mut values: Vec<_> = ["minimum", "median", "maximum"]
         .map(|key| {
             overall
@@ -301,7 +350,7 @@ pub async fn run_locked(
             warn(&mut tx, sync, &format!("Discogs collection currency changed from {previous} to {currency}; historical amounts retain their original currency.")).await?;
         }
     }
-    sqlx::query("INSERT INTO user_collection_history (user_id, timestamp, total_items, value_min, value_median, value_max, currency, raw_values) SELECT $1, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"'), $3, $4::text::numeric, $5::text::numeric, $6::text::numeric, $7, $8 FROM user_sync_runs WHERE id=$2 AND user_id=$1 ON CONFLICT (user_id,timestamp) DO UPDATE SET total_items=EXCLUDED.total_items, value_min=EXCLUDED.value_min, value_median=EXCLUDED.value_median, value_max=EXCLUDED.value_max, currency=EXCLUDED.currency, raw_values=EXCLUDED.raw_values")
+    sqlx::query("INSERT INTO user_collection_history (user_id, timestamp, total_items, value_min, value_median, value_max, currency, raw_values, source) SELECT $1, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"'), $3, $4::text::numeric, $5::text::numeric, $6::text::numeric, $7, $8, 'observed' FROM user_sync_runs WHERE id=$2 AND user_id=$1 ON CONFLICT (user_id,timestamp) DO UPDATE SET total_items=EXCLUDED.total_items, value_min=EXCLUDED.value_min, value_median=EXCLUDED.value_median, value_max=EXCLUDED.value_max, currency=EXCLUDED.currency, raw_values=EXCLUDED.raw_values, source='observed'")
         .bind(sync.user_id).bind(sync.run_id).bind(i32::try_from(entries.len())?)
         .bind(values[0].as_ref().map(|v| v.0.to_string())).bind(values[1].as_ref().map(|v| v.0.to_string())).bind(values[2].as_ref().map(|v| v.0.to_string())).bind(currency).bind(overall).execute(&mut *tx).await?;
     tx.commit().await?;

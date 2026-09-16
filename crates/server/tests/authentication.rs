@@ -1049,6 +1049,7 @@ async fn library_dashboard_and_settings_are_user_scoped_paginated_and_currency_a
     assert_eq!(dashboard["total_items"], 2);
     assert_eq!(dashboard["values"].as_array().unwrap().len(), 2);
     assert_eq!(dashboard["history"][0]["median"], "50");
+    assert_eq!(dashboard["history"][0]["source"], "observed");
     assert!(!body.contains("GBP"));
     assert_eq!(dashboard["genres"].as_array().unwrap().len(), 2);
     assert_eq!(dashboard["summaries"][0]["median"], "50");

@@ -221,7 +221,7 @@ pub(super) async fn dashboard(
         SELECT *, row_number() OVER (PARTITION BY currency ORDER BY timestamp::timestamptz, timestamp) AS rn,
         count(*) OVER (PARTITION BY currency) AS n
         FROM user_collection_history WHERE user_id=$1 AND ($2::int IS NULL OR timestamp::timestamptz>=now()-make_interval(days=>$2))
-    ) SELECT jsonb_build_object('timestamp',timestamp,'total_items',total_items,'minimum',value_min::text,'median',value_median::text,'maximum',value_max::text,'currency',currency)
+    ) SELECT jsonb_build_object('timestamp',timestamp,'total_items',total_items,'minimum',value_min::text,'median',value_median::text,'maximum',value_max::text,'currency',currency,'source',source)
     FROM ranked WHERE rn=n OR (rn-1)%GREATEST(1,ceil(n/998.0)::bigint)=0 ORDER BY timestamp::timestamptz,timestamp")
         .bind(user).bind(days).fetch_all(&state.pool).await?;
     let format_counts: Vec<(Option<String>, i64)> = sqlx::query_as("SELECT r.format,count(*) FROM user_collection_items i JOIN releases r ON r.id=i.release_id WHERE i.user_id=$1 GROUP BY r.format")
