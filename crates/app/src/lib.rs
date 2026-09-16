@@ -13,6 +13,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
 
+const VERSION_LABEL: &str = concat!("v", env!("CARGO_PKG_VERSION"));
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Bootstrap {
     pub user: Option<Value>,
@@ -23,8 +25,8 @@ pub struct Bootstrap {
 #[component]
 fn SiteFooter() -> impl IntoView {
     view! {
-        <footer class="site-footer">
-            {concat!("v", env!("CARGO_PKG_VERSION"))}
+        <footer class="site-footer text-neutral-500 text-xs">
+            {VERSION_LABEL}
         </footer>
     }
 }
@@ -118,6 +120,6 @@ mod tests {
     fn footer_displays_package_version() {
         let html = view! { <SiteFooter/> }.to_html();
 
-        assert!(html.contains(concat!("v", env!("CARGO_PKG_VERSION"))));
+        assert!(html.contains(VERSION_LABEL));
     }
 }
