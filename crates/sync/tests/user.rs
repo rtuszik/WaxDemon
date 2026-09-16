@@ -196,6 +196,11 @@ async fn backfills_inferred_counts_once_before_the_first_observed_snapshot_witho
 {
     let (pool, admin, schema) = database().await;
     let alice = user(&pool, 11, "alice").await;
+    sqlx::query("UPDATE user_sync_runs SET created_at='2025-01-15T12:00:00Z' WHERE id=$1")
+        .bind(alice.run_id)
+        .execute(&pool)
+        .await
+        .unwrap();
     sqlx::query("INSERT INTO user_collection_history (user_id,timestamp,total_items) VALUES ($1,'2025-02-01T00:00:00Z',9)")
         .bind(alice.user_id).execute(&pool).await.unwrap();
     let server = MockServer::start().await;
@@ -230,7 +235,6 @@ async fn backfills_inferred_counts_once_before_the_first_observed_snapshot_witho
         vec![
             ("2024-12-31T00:00:00Z".into(), 1, "inferred".into()),
             ("2025-01-01T00:00:00Z".into(), 2, "inferred".into()),
-            ("2025-01-15T00:00:00Z".into(), 3, "inferred".into()),
         ]
     );
     let observed: i64 = sqlx::query_scalar(
@@ -266,7 +270,6 @@ async fn backfills_inferred_counts_once_before_the_first_observed_snapshot_witho
         vec![
             ("2024-12-31T00:00:00Z".into(), 1),
             ("2025-01-01T00:00:00Z".into(), 2),
-            ("2025-01-15T00:00:00Z".into(), 3),
         ]
     );
     cleanup(pool, admin, schema).await;
