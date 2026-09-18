@@ -19,3 +19,7 @@ They need to be well thought out and SHOULD:
 The tests should be accompanied by relevant GitHub actions that run both linting and testing.
 
 Do not add or expand documentation unless explicitly requested. When a change makes existing user instructions incorrect, make only the smallest factual correction. README content must help users install, configure, or use the application. Keep implementation details, out of it.
+
+---
+
+Discogs Documentation must be retrieved through Firecrawl at https://www.discogs.com/developers/ as it is not available through normal fetch tools.
