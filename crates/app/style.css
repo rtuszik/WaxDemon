@@ -278,9 +278,8 @@ main {
 }
 .site-footer {
     flex-shrink: 0;
-    margin: 24px -24px -24px;
-    padding: 12px 24px;
-    background: #000;
+    margintop: 24px;
+    padding: 12px 0px;
     text-align: center;
 }
 h1,
