@@ -8,9 +8,9 @@ backend = "cargo:cargo-edit"
 specifiers = ["0.13.13"]
 
 [[tools."cargo:cargo-leptos"]]
-version = "0.3.7"
+version = "0.3.8"
 backend = "cargo:cargo-leptos"
-specifiers = ["0.3.7"]
+specifiers = ["0.3.8"]
 
 [[tools."cargo:leptosfmt"]]
 version = "0.1.33"
