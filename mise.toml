@@ -6,7 +6,7 @@
 "cargo:leptosfmt" = "latest"
 cocogitto = "7.0.0"
 opengrep = "latest"
-oxfmt = "0.66.0"
+oxfmt = "0.68.0"
 rust = "1.98.1"
 rust-analyzer = "latest"
 zizmor = "latest"
