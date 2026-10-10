@@ -5,6 +5,7 @@
 "cargo:cargo-leptos" = "0.3.7"
 "cargo:leptosfmt" = "latest"
 cocogitto = "7.0.0"
+"npm:squawk-cli" = "latest"
 opengrep = "latest"
 oxfmt = "0.66.0"
 rust = "1.98.1"
@@ -26,13 +27,17 @@ run = "oxfmt -c .oxfmtrc.json ."
 description = "Clippy with -D warnings across all targets"
 run = "cargo clippy --workspace --all-targets --all-features -- -D warnings"
 
+[tasks.squawk]
+description = "Lint new Postgres migrations; 0001-0009 are already applied and excluded"
+run = "squawk --pg-version=18 --assume-in-transaction --no-error-on-unmatched-pattern --exclude-path='crates/db/migrations/000*.sql' 'crates/db/migrations/*.sql'"
+
 [tasks.test]
 description = "Run the full test suite. Needs TEST_DATABASE_URL for db-backed tests."
 run = "cargo test --workspace -- --test-threads=1"
 
 [tasks.ci]
 description = "Full pre-push check: format, clippy, build, test"
-depends = ["fmt-check", "clippy", "test", "frontend", "clippy-wasm"]
+depends = ["fmt-check", "clippy", "squawk", "test", "frontend", "clippy-wasm"]
 
 [tasks.frontend]
 description = "Build the server and Rust/WASM browser assets"
