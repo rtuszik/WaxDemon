@@ -15,7 +15,7 @@ pub async fn enqueue(
 
 pub async fn enqueue_due(pool: &PgPool) -> Result<u64, sqlx::Error> {
     let mut tx = pool.begin().await?;
-    let users: Vec<i64> = sqlx::query_scalar("SELECT u.id FROM users u LEFT JOIN user_preferences p ON p.user_id=u.id WHERE u.status='approved' AND EXISTS (SELECT 1 FROM discogs_connections c WHERE c.user_id=u.id) AND COALESCE(p.sync_interval_hours,24)>0 AND NOT EXISTS (SELECT 1 FROM user_sync_runs r WHERE r.user_id=u.id AND (r.status IN ('queued','running') OR COALESCE(r.finished_at,r.created_at)>now()-make_interval(hours=>COALESCE(p.sync_interval_hours,24)))) ORDER BY u.id FOR UPDATE OF u SKIP LOCKED LIMIT 100")
+    let users: Vec<i64> = sqlx::query_scalar("SELECT u.id FROM users u CROSS JOIN app_settings s LEFT JOIN user_preferences p ON p.user_id=u.id WHERE u.status='approved' AND EXISTS (SELECT 1 FROM discogs_connections c WHERE c.user_id=u.id) AND COALESCE(p.sync_interval_hours,s.sync_interval_hours)>0 AND NOT EXISTS (SELECT 1 FROM user_sync_runs r WHERE r.user_id=u.id AND (r.status IN ('queued','running') OR COALESCE(r.finished_at,r.created_at)>now()-make_interval(hours=>COALESCE(p.sync_interval_hours,s.sync_interval_hours)::int))) ORDER BY u.id FOR UPDATE OF u SKIP LOCKED LIMIT 100")
         .fetch_all(&mut *tx).await?;
     let mut count = 0;
     for id in users {

@@ -56,7 +56,7 @@ pub fn App() -> impl IntoView {
         <Router>
             <header class="topbar">
                 <A href="/" attr:class="brand">"WaxDemon"</A>
-                {approved.then(||view!{<nav aria-label="Main navigation"><A href="/">"Overview"</A><A href="/library">"Library"</A><A href="/settings">"Settings"</A>{admin.then(||view!{<A href="/admin/users">"Approvals"</A>})}</nav>})}
+                {approved.then(||view!{<nav aria-label="Main navigation"><A href="/">"Overview"</A><A href="/library">"Library"</A><A href="/settings">"Settings"</A>{admin.then(||view!{<A href="/admin/users">"Admin"</A>})}</nav>})}
                 {bootstrap.user.is_some().then(||view!{<div class="account-menu"><span>{username}</span><form method="post" action="/auth/logout"><input type="hidden" name="csrf" value=csrf/><button class="quiet">"Sign out"</button></form></div>})}
             </header>
             <main id="main-content">
@@ -66,7 +66,7 @@ pub fn App() -> impl IntoView {
                     <Route path=path!("library") view=pages::Library/>
                     <Route path=path!("library/:id") view=pages::RecordDetail/>
                     <Route path=path!("settings") view=pages::Settings/>
-                    <Route path=path!("admin/users") view=pages::Approvals/>
+                    <Route path=path!("admin/users") view=pages::Admin/>
                 </Routes>
             </main>
             <SiteFooter/>

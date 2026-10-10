@@ -525,24 +525,20 @@ async fn browser_hydration_library_settings_and_chart_lifecycle() {
     driver.wait("document.querySelector('.detail-price').textContent.includes('20.25') && document.body.textContent.includes('Very Good (VG)')").await;
     driver.click("header nav a[href='/settings']").await;
     driver
-        .wait("document.querySelector('[name=sync_interval_hours]')?.value==='24'")
+        .wait("document.body.textContent.includes('Sync runs every 24 hours.')")
         .await;
     driver.snapshot("settings").await;
-    driver.script("const input=document.querySelector('[name=sync_interval_hours]');input.value='48';input.dispatchEvent(new Event('input',{bubbles:true}));input.form.requestSubmit();").await;
+    driver.script("const select=document.querySelector('[name=display_currency]');select.value='EUR';select.dispatchEvent(new Event('change',{bubbles:true}));select.form.requestSubmit();").await;
     driver
         .wait("document.body.textContent.includes('Preferences saved.')")
         .await;
-    let interval: i32 =
-        sqlx::query_scalar("SELECT sync_interval_hours FROM user_preferences WHERE user_id=$1")
+    let currency: String =
+        sqlx::query_scalar("SELECT display_currency FROM user_preferences WHERE user_id=$1")
             .bind(id)
             .fetch_one(&pool)
             .await
             .unwrap();
-    assert_eq!(interval, 48);
-    driver.goto(&format!("{origin}/settings")).await;
-    driver
-        .wait("document.querySelector('[name=sync_interval_hours]')?.value==='48'")
-        .await;
+    assert_eq!(currency, "EUR");
     provider(&provider_server, 701).await;
     let second = webdriver::Driver::start().await;
     second.goto(&format!("{origin}/auth/login")).await;
@@ -562,15 +558,26 @@ async fn browser_hydration_library_settings_and_chart_lifecycle() {
     second.wait("document.body.textContent.includes('Awaiting approval') && !document.body.textContent.includes('First Record')").await;
     driver.click("header nav a[href='/admin/users']").await;
     driver
-        .wait("document.querySelector('h1')?.textContent==='Pending accounts'")
+        .wait("document.querySelector('h1')?.textContent==='Administration'")
         .await;
-    driver.snapshot("approvals").await;
+    driver.snapshot("admin").await;
+    driver.script("const input=document.querySelector('form[action=\"/admin/settings\"] [name=sync_interval_hours]');input.value='48';input.dispatchEvent(new Event('input',{bubbles:true}));input.form.requestSubmit();").await;
     driver
-        .wait("document.querySelector('.approval')?.textContent.includes('owner-701')")
+        .wait("document.querySelector('form[action=\"/admin/settings\"]')?.textContent.includes('Saved.')")
         .await;
-    driver.click(".approval button").await;
+    let interval: i64 = sqlx::query_scalar("SELECT sync_interval_hours FROM app_settings")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(interval, 48);
     driver
-        .wait("document.body.textContent.includes('No accounts are waiting for approval.')")
+        .wait("document.querySelector('[data-user=\"owner-701\"]')?.textContent.includes('· pending ·')")
+        .await;
+    driver
+        .click("[data-user='owner-701'] .approval button")
+        .await;
+    driver
+        .wait("document.querySelector('[data-user=\"owner-701\"]')?.textContent.includes('· approved ·')")
         .await;
     let second_id: i64 = sqlx::query_scalar(
         "SELECT id FROM users WHERE discogs_id=701 AND status='approved' AND role='user'",
@@ -933,8 +940,8 @@ async fn rendered_pages_escape_private_data_and_preserve_empty_filters_and_saved
     sqlx::query("INSERT INTO user_preferences (user_id,sync_interval_hours,price_refresh_hours,display_currency) VALUES ($1,48,72,'EUR')").bind(id).execute(&pool).await.unwrap();
     let (status, _, body) = owner.request("GET", "/settings", "", None).await;
     assert_eq!(status, StatusCode::OK);
-    assert!(body.contains("value=\"48\""));
-    assert!(body.contains("value=\"72\""));
+    assert!(body.contains("Sync runs every 48 hours. Cached prices refresh after 72 hours."));
+    assert!(!body.contains("name=\"sync_interval_hours\""));
     assert!(body.contains("value=\"EUR\" selected"));
     cleanup(pool, admin, schema).await;
 }
@@ -1166,7 +1173,7 @@ async fn library_dashboard_and_settings_are_user_scoped_paginated_and_currency_a
             .0,
         StatusCode::NO_CONTENT
     );
-    let invalid = format!("csrf={csrf}&sync_interval_hours=-1&price_refresh_hours=0");
+    let invalid = format!("csrf={csrf}&display_currency=eur");
     assert_eq!(
         alice
             .request(
@@ -1181,7 +1188,8 @@ async fn library_dashboard_and_settings_are_user_scoped_paginated_and_currency_a
     );
     let (_, _, body) = alice.request("GET", "/api/settings", "", None).await;
     let settings: serde_json::Value = serde_json::from_str(&body).unwrap();
-    assert_eq!(settings["preferences"]["sync_interval_hours"], 0);
+    assert_eq!(settings["preferences"]["sync_interval_hours"], 24);
+    assert_eq!(settings["preferences"]["price_refresh_hours"], 24);
     assert_eq!(settings["preferences"]["display_currency"], "EUR");
     assert!(!body.contains("secret"));
     let (_, _, body) = bob.request("GET", "/api/settings", "", None).await;
@@ -2275,4 +2283,420 @@ async fn dashboard_limits_are_user_scoped_across_routes_on_one_router() {
         StatusCode::NO_CONTENT
     );
     cleanup(pool, admin, schema).await;
+}
+
+async fn submit(browser: &mut Browser, uri: &str, body: &str) -> StatusCode {
+    let csrf = browser.me().await["csrf"].as_str().unwrap().to_string();
+    let body = if body.is_empty() {
+        format!("csrf={csrf}")
+    } else {
+        format!("csrf={csrf}&{body}")
+    };
+    browser
+        .request("POST", uri, &body, Some("https://wax.example"))
+        .await
+        .0
+}
+
+async fn signed_in(pool: &PgPool, server: &MockServer, discogs_id: i64) -> (Browser, i64) {
+    provider(server, discogs_id).await;
+    let mut browser = browser(pool, server);
+    browser.login().await;
+    let id = browser.me().await["user"]["id"].as_i64().unwrap();
+    (browser, id)
+}
+
+async fn admin_session(pool: &PgPool, server: &MockServer, discogs_id: i64) -> (Browser, i64) {
+    sqlx::query(
+        "INSERT INTO users (discogs_id,username,role,status) VALUES ($1,$2,'admin','approved')",
+    )
+    .bind(discogs_id)
+    .bind(format!("owner-{discogs_id}"))
+    .execute(pool)
+    .await
+    .unwrap();
+    signed_in(pool, server, discogs_id).await
+}
+
+async fn user_status(pool: &PgPool, id: i64) -> Option<String> {
+    sqlx::query_scalar("SELECT status FROM users WHERE id=$1")
+        .bind(id)
+        .fetch_optional(pool)
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn admin_panel_lists_users_and_manages_global_intervals_and_overrides() {
+    let (pool, admin_db, schema) = database().await;
+    let server = MockServer::start().await;
+    let (mut admin, admin_id) = admin_session(&pool, &server, 1).await;
+    let (mut member, member_id) = signed_in(&pool, &server, 2).await;
+
+    for (uri, body) in [
+        (
+            "/admin/settings",
+            "sync_interval_hours=1&price_refresh_hours=1",
+        ),
+        (
+            &*format!("/admin/users/{member_id}/overrides"),
+            "sync_interval_hours=1&price_refresh_hours=",
+        ),
+        (&*format!("/admin/users/{admin_id}/disable"), ""),
+        (&*format!("/admin/users/{admin_id}/enable"), ""),
+        (
+            &*format!("/admin/users/{admin_id}/delete"),
+            "confirm=owner-1",
+        ),
+    ] {
+        assert_eq!(
+            submit(&mut member, uri, body).await,
+            StatusCode::FORBIDDEN,
+            "{uri}"
+        );
+    }
+    assert_eq!(
+        member.request("GET", "/api/admin/users", "", None).await.0,
+        StatusCode::FORBIDDEN
+    );
+
+    let (status, _, body) = admin.request("GET", "/api/admin/users", "", None).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert!(!body.contains("session_revocation"));
+    let listing: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(
+        listing["settings"],
+        serde_json::json!({"sync_interval_hours":24,"price_refresh_hours":24})
+    );
+    let users = listing["users"].as_array().unwrap();
+    assert_eq!(users.len(), 2);
+    assert_eq!(users[0]["id"], member_id, "pending users come first");
+    assert_eq!(users[0]["status"], "pending");
+    assert!(users[0]["last_login_at"].is_string());
+    assert!(users[0]["sync_interval_hours"].is_null());
+    assert_eq!(users[1]["role"], "admin");
+
+    assert_eq!(
+        submit(&mut admin, &format!("/admin/users/{member_id}/approve"), "").await,
+        StatusCode::SEE_OTHER
+    );
+    for invalid in [
+        "sync_interval_hours=-1&price_refresh_hours=24",
+        "sync_interval_hours=24&price_refresh_hours=0",
+        "sync_interval_hours=&price_refresh_hours=24",
+        "sync_interval_hours=721&price_refresh_hours=24",
+    ] {
+        assert_eq!(
+            submit(&mut admin, "/admin/settings", invalid).await,
+            StatusCode::BAD_REQUEST,
+            "{invalid}"
+        );
+    }
+    assert_eq!(
+        submit(
+            &mut admin,
+            "/admin/settings",
+            "sync_interval_hours=48&price_refresh_hours=12"
+        )
+        .await,
+        StatusCode::SEE_OTHER
+    );
+    let preferences = |body: String| {
+        serde_json::from_str::<serde_json::Value>(&body).unwrap()["preferences"].clone()
+    };
+    let (_, _, body) = member.request("GET", "/api/settings", "", None).await;
+    assert_eq!(preferences(body)["sync_interval_hours"], 48);
+
+    let overrides = format!("/admin/users/{member_id}/overrides");
+    assert_eq!(
+        submit(
+            &mut admin,
+            &overrides,
+            "sync_interval_hours=6&price_refresh_hours="
+        )
+        .await,
+        StatusCode::SEE_OTHER
+    );
+    let (_, _, body) = member.request("GET", "/api/settings", "", None).await;
+    let effective = preferences(body);
+    assert_eq!(effective["sync_interval_hours"], 6);
+    assert_eq!(effective["price_refresh_hours"], 12);
+    let (_, _, body) = member.request("GET", "/settings", "", None).await;
+    assert!(body.contains("Sync runs every 6 hours. Cached prices refresh after 12 hours."));
+
+    assert_eq!(
+        submit(
+            &mut member,
+            "/api/settings",
+            "sync_interval_hours=1&price_refresh_hours=1&display_currency=EUR"
+        )
+        .await,
+        StatusCode::NO_CONTENT
+    );
+    let (_, _, body) = member.request("GET", "/api/settings", "", None).await;
+    assert_eq!(
+        preferences(body),
+        serde_json::json!({"sync_interval_hours":6,"price_refresh_hours":12,"display_currency":"EUR"}),
+        "users cannot change their own intervals"
+    );
+
+    assert_eq!(
+        submit(
+            &mut admin,
+            &overrides,
+            "sync_interval_hours=721&price_refresh_hours="
+        )
+        .await,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        submit(
+            &mut admin,
+            "/admin/users/999999/overrides",
+            "sync_interval_hours=6&price_refresh_hours="
+        )
+        .await,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        submit(
+            &mut admin,
+            &overrides,
+            "sync_interval_hours=&price_refresh_hours="
+        )
+        .await,
+        StatusCode::SEE_OTHER
+    );
+    let (_, _, body) = member.request("GET", "/api/settings", "", None).await;
+    let effective = preferences(body);
+    assert_eq!(effective["sync_interval_hours"], 48);
+    assert_eq!(effective["display_currency"], "EUR");
+    cleanup(pool, admin_db, schema).await;
+}
+
+#[tokio::test]
+async fn scheduler_uses_global_interval_unless_a_user_override_exists() {
+    let (pool, admin_db, schema) = database().await;
+    let server = MockServer::start().await;
+    let (_, id) = signed_in(&pool, &server, 5).await;
+    sqlx::query("UPDATE users SET status='approved' WHERE id=$1")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let last_finished = |hours: i32| {
+        let pool = pool.clone();
+        async move {
+            sqlx::query("DELETE FROM user_sync_runs WHERE user_id=$1")
+                .bind(id)
+                .execute(&pool)
+                .await
+                .unwrap();
+            sqlx::query("INSERT INTO user_sync_runs (user_id,status,finished_at) VALUES ($1,'completed',now()-make_interval(hours=>$2))")
+                .bind(id).bind(hours).execute(&pool).await.unwrap();
+        }
+    };
+    let configure = |global: i32, own: Option<i32>| {
+        let pool = pool.clone();
+        async move {
+            sqlx::query("UPDATE app_settings SET sync_interval_hours=$1")
+                .bind(global)
+                .execute(&pool)
+                .await
+                .unwrap();
+            sqlx::query("INSERT INTO user_preferences (user_id,sync_interval_hours) VALUES ($1,$2) ON CONFLICT (user_id) DO UPDATE SET sync_interval_hours=EXCLUDED.sync_interval_hours")
+                .bind(id).bind(own).execute(&pool).await.unwrap();
+        }
+    };
+    for (global, own, since, due) in [
+        (24, None, 30, true),
+        (48, None, 30, false),
+        (48, Some(24), 30, true),
+        (12, Some(48), 30, false),
+        (24, Some(0), 1000, false),
+        (0, None, 1000, false),
+        (0, Some(24), 30, true),
+    ] {
+        configure(global, own).await;
+        last_finished(since).await;
+        assert_eq!(
+            waxdemon_db::user_sync::enqueue_due(&pool).await.unwrap(),
+            u64::from(due),
+            "global={global} override={own:?} finished {since}h ago"
+        );
+    }
+    cleanup(pool, admin_db, schema).await;
+}
+
+#[tokio::test]
+async fn admin_can_disable_enable_reapprove_and_delete_other_accounts_but_not_their_own() {
+    let (pool, admin_db, schema) = database().await;
+    let server = MockServer::start().await;
+    let (mut admin, admin_id) = admin_session(&pool, &server, 1).await;
+    let (mut member, member_id) = signed_in(&pool, &server, 2).await;
+    assert_eq!(
+        submit(&mut admin, &format!("/admin/users/{member_id}/approve"), "").await,
+        StatusCode::SEE_OTHER
+    );
+    let queued: i64 =
+        sqlx::query_scalar("SELECT id FROM user_sync_runs WHERE user_id=$1 AND status='queued'")
+            .bind(member_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+    for action in ["disable", "delete"] {
+        assert_eq!(
+            submit(
+                &mut admin,
+                &format!("/admin/users/{admin_id}/{action}"),
+                "confirm=owner-1"
+            )
+            .await,
+            StatusCode::CONFLICT,
+            "self {action}"
+        );
+    }
+    assert_eq!(
+        user_status(&pool, admin_id).await.as_deref(),
+        Some("approved")
+    );
+
+    let disable = format!("/admin/users/{member_id}/disable");
+    assert_eq!(
+        submit(&mut admin, &disable, "").await,
+        StatusCode::SEE_OTHER
+    );
+    assert_eq!(submit(&mut admin, &disable, "").await, StatusCode::CONFLICT);
+    assert_eq!(
+        user_status(&pool, member_id).await.as_deref(),
+        Some("disabled")
+    );
+    assert_eq!(
+        member.request("GET", "/auth/me", "", None).await.0,
+        StatusCode::UNAUTHORIZED
+    );
+    let run: (String, Option<String>) =
+        sqlx::query_as("SELECT status,error FROM user_sync_runs WHERE id=$1")
+            .bind(queued)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(run, ("cancelled".into(), Some("Account disabled".into())));
+    provider(&server, 2).await;
+    let mut blocked = browser(&pool, &server);
+    let (callback, _) = blocked.start().await;
+    assert_eq!(
+        blocked.request("GET", &callback, "", None).await.0,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        submit(&mut admin, &format!("/admin/users/{member_id}/approve"), "").await,
+        StatusCode::CONFLICT,
+        "disabled accounts are enabled, not approved"
+    );
+
+    assert_eq!(
+        submit(&mut admin, &format!("/admin/users/{member_id}/enable"), "").await,
+        StatusCode::SEE_OTHER
+    );
+    assert_eq!(
+        user_status(&pool, member_id).await.as_deref(),
+        Some("approved")
+    );
+    let requeued: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM user_sync_runs WHERE user_id=$1 AND status='queued'",
+    )
+    .bind(member_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(requeued, 1);
+    let (mut member, _) = signed_in(&pool, &server, 2).await;
+
+    let (mut rejected, rejected_id) = signed_in(&pool, &server, 3).await;
+    assert_eq!(
+        submit(
+            &mut admin,
+            &format!("/admin/users/{rejected_id}/reject"),
+            ""
+        )
+        .await,
+        StatusCode::SEE_OTHER
+    );
+    assert_eq!(
+        rejected.request("GET", "/auth/me", "", None).await.0,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        submit(
+            &mut admin,
+            &format!("/admin/users/{rejected_id}/approve"),
+            ""
+        )
+        .await,
+        StatusCode::SEE_OTHER
+    );
+    assert_eq!(
+        user_status(&pool, rejected_id).await.as_deref(),
+        Some("approved")
+    );
+
+    sqlx::query("INSERT INTO releases (id,title) VALUES (1,'Shared release')")
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO user_collection_items (user_id,instance_id,release_id,added_date) VALUES ($1,1,1,'2025-01-01'),($2,2,1,'2025-01-01')")
+        .bind(member_id).bind(rejected_id).execute(&pool).await.unwrap();
+    let delete = format!("/admin/users/{member_id}/delete");
+    assert_eq!(
+        submit(&mut admin, &delete, "confirm=someone-else").await,
+        StatusCode::BAD_REQUEST
+    );
+    assert!(user_status(&pool, member_id).await.is_some());
+    assert_eq!(
+        submit(&mut admin, &delete, "confirm=owner-2").await,
+        StatusCode::SEE_OTHER
+    );
+    assert!(user_status(&pool, member_id).await.is_none());
+    assert_eq!(
+        member.request("GET", "/auth/me", "", None).await.0,
+        StatusCode::UNAUTHORIZED
+    );
+    let remaining: Vec<i64> = sqlx::query_scalar("SELECT user_id FROM user_collection_items")
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+    assert_eq!(remaining, vec![rejected_id]);
+    assert_eq!(
+        submit(&mut admin, &delete, "confirm=owner-2").await,
+        StatusCode::NOT_FOUND
+    );
+    cleanup(pool, admin_db, schema).await;
+}
+
+#[tokio::test]
+async fn disabling_another_admin_keeps_the_acting_admin_as_the_last_one() {
+    let (pool, admin_db, schema) = database().await;
+    let server = MockServer::start().await;
+    let (mut first, first_id) = admin_session(&pool, &server, 1).await;
+    let (mut second, second_id) = admin_session(&pool, &server, 2).await;
+    assert_eq!(
+        submit(&mut second, &format!("/admin/users/{first_id}/disable"), "").await,
+        StatusCode::SEE_OTHER
+    );
+    assert_eq!(
+        first.request("GET", "/api/admin/users", "", None).await.0,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        submit(&mut second, "/auth/delete-account", "confirm=owner-2").await,
+        StatusCode::CONFLICT,
+        "the remaining approved admin cannot delete their own account"
+    );
+    assert_eq!(
+        user_status(&pool, second_id).await.as_deref(),
+        Some("approved")
+    );
+    cleanup(pool, admin_db, schema).await;
 }

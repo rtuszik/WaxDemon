@@ -102,6 +102,10 @@ impl AuthnBackend for AuthState {
             tx.rollback().await?;
             return Ok(None);
         }
+        sqlx::query("UPDATE users SET last_login_at=now() WHERE id=$1")
+            .bind(user.id)
+            .execute(&mut *tx)
+            .await?;
         let had_connection: bool =
             sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM discogs_connections WHERE user_id=$1)")
                 .bind(user.id)
