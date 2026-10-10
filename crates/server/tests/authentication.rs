@@ -573,12 +573,23 @@ async fn browser_hydration_library_settings_and_chart_lifecycle() {
     driver
         .wait("document.querySelector('[data-user=\"owner-701\"]')?.textContent.includes('· pending ·')")
         .await;
+    let own_override =
+        "document.querySelector('[data-user=\"owner-700\"] [name=sync_interval_hours]')";
+    driver
+        .wait(&format!("{own_override}?.placeholder==='Default (48)'"))
+        .await;
+    driver.script(&format!("const input={own_override};input.value='7';input.dispatchEvent(new Event('input',{{bubbles:true}}));")).await;
     driver
         .click("[data-user='owner-701'] .approval button")
         .await;
     driver
         .wait("document.querySelector('[data-user=\"owner-701\"]')?.textContent.includes('· approved ·')")
         .await;
+    assert_eq!(
+        driver.script(&format!("return {own_override}.value")).await,
+        "7",
+        "unsaved input in other rows survives a refetch"
+    );
     let second_id: i64 = sqlx::query_scalar(
         "SELECT id FROM users WHERE discogs_id=701 AND status='approved' AND role='user'",
     )
