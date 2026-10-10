@@ -563,7 +563,7 @@ async fn browser_hydration_library_settings_and_chart_lifecycle() {
     driver.snapshot("admin").await;
     driver.script("const input=document.querySelector('form[action=\"/admin/settings\"] [name=sync_interval_hours]');input.value='48';input.dispatchEvent(new Event('input',{bubbles:true}));input.form.requestSubmit();").await;
     driver
-        .wait("document.querySelector('form[action=\"/admin/settings\"]')?.textContent.includes('Saved.')")
+        .wait("document.getElementById('admin-notice')?.textContent==='Defaults saved.'")
         .await;
     let interval: i64 = sqlx::query_scalar("SELECT sync_interval_hours FROM app_settings")
         .fetch_one(&pool)
