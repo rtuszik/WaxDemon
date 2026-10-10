@@ -2,6 +2,19 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.10.0](https://github.com/rtuszik/WaxDemon/compare/d6c83f066e57331057bc7522408b9269b80ac467..v1.10.0) - 2026-10-10
+#### Features
+- (**admin**) add administration panel and configurable sync intervals - ([634f1cc](https://github.com/rtuszik/WaxDemon/commit/634f1ccd0ef846203bec1849e9729164ba056681)) - [@rtuszik](https://github.com/rtuszik)
+#### Bug Fixes
+- (**admin**) preserve unsaved inputs across user refetches - ([deb94ba](https://github.com/rtuszik/WaxDemon/commit/deb94ba62f26c1179a9dd535868e0657d03c5443)) - [@rtuszik](https://github.com/rtuszik)
+- (**admin**) display distinct defaults and overrides save notices - ([e9f1be3](https://github.com/rtuszik/WaxDemon/commit/e9f1be3f3fae823138c509c9ebae36286f92b97f)) - [@rtuszik](https://github.com/rtuszik)
+#### Continuous Integration
+- lint new Postgres migrations in CI - ([3ddfc47](https://github.com/rtuszik/WaxDemon/commit/3ddfc47921ca688344b32fb014fb710dbe748072)) - [@rtuszik](https://github.com/rtuszik)
+#### Style
+- adjust footer spacing and background styling - ([d6c83f0](https://github.com/rtuszik/WaxDemon/commit/d6c83f066e57331057bc7522408b9269b80ac467)) - [@rtuszik](https://github.com/rtuszik)
+
+- - -
+
 ## [v1.9.0](https://github.com/rtuszik/WaxDemon/compare/e50c9248f0d0c1d7f54b8e37c6d4240dc3935a8d..v1.9.0) - 2026-09-16
 #### Features
 - (**app**) add version footer to the application layout - ([4f48b11](https://github.com/rtuszik/WaxDemon/commit/4f48b11f5a5b8f0a9a9772799cf8c931d9695d98)) - [@rtuszik](https://github.com/rtuszik)
