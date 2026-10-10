@@ -1164,11 +1164,15 @@ pub fn Admin() -> impl IntoView {
         .unwrap_or_default()
         .user
         .and_then(|u| u["id"].as_i64());
+    let notice = RwSignal::new(String::new());
     view! {
         <div class="page-heading">
             <h1>"Administration"</h1>
         </div>
         <Status remote=data />
+        <p id="admin-notice" class="muted" role="status">
+            {move || notice.get()}
+        </p>
         {move || {
             let settings = data.data.get()["settings"].clone();
             (!settings.is_null())
@@ -1181,6 +1185,7 @@ pub fn Admin() -> impl IntoView {
                                 values=settings.clone()
                                 defaults=Value::Null
                                 refresh=data
+                                notice=notice
                             />
                         </section>
                     }
@@ -1284,6 +1289,7 @@ pub fn Admin() -> impl IntoView {
                                     values=user.clone()
                                     defaults=defaults.clone()
                                     refresh=data
+                                    notice=notice
                                 />
                                 {(!own)
                                     .then(|| {
@@ -1309,7 +1315,13 @@ fn day(value: &Value) -> String {
 }
 
 #[component]
-fn IntervalsForm(action: String, values: Value, defaults: Value, refresh: Remote) -> impl IntoView {
+fn IntervalsForm(
+    action: String,
+    values: Value,
+    defaults: Value,
+    refresh: Remote,
+    notice: RwSignal<String>,
+) -> impl IntoView {
     let field = |key: &str| {
         values[key]
             .as_i64()
@@ -1343,6 +1355,7 @@ fn IntervalsForm(action: String, values: Value, defaults: Value, refresh: Remote
                 }
                 busy.set(true);
                 message.set(String::new());
+                notice.set(String::new());
                 let fields = vec![
                     ("csrf".into(), token.clone()),
                     ("sync_interval_hours".into(), sync.get_untracked()),
@@ -1352,7 +1365,7 @@ fn IntervalsForm(action: String, values: Value, defaults: Value, refresh: Remote
                 leptos::task::spawn_local(async move {
                     match post(&target, fields).await {
                         Ok(()) => {
-                            message.set("Saved.".into());
+                            notice.set(if overrides { "Overrides saved." } else { "Defaults saved." }.into());
                             refresh.revision.update(|r| *r += 1);
                         }
                         Err(e) => message.set(e),
