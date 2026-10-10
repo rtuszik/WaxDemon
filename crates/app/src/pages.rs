@@ -1165,6 +1165,17 @@ pub fn Admin() -> impl IntoView {
         .user
         .and_then(|u| u["id"].as_i64());
     let notice = RwSignal::new(String::new());
+    let settings = Memo::new(move |_| data.data.get()["settings"].clone());
+    // Keyed by row content so refetches keep unsaved input in unchanged rows.
+    let users = Memo::new(move |_| {
+        data.data.get()["users"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|user| (user.to_string(), user))
+            .collect::<Vec<_>>()
+    });
     view! {
         <div class="page-heading">
             <h1>"Administration"</h1>
@@ -1174,135 +1185,117 @@ pub fn Admin() -> impl IntoView {
             {move || notice.get()}
         </p>
         {move || {
-            let settings = data.data.get()["settings"].clone();
-            (!settings.is_null())
+            let values = settings.get();
+            (!values.is_null())
                 .then(|| {
                     view! {
                         <section class="panel">
                             <h2>"Sync defaults"</h2>
                             <IntervalsForm
                                 action="/admin/settings".into()
-                                values=settings.clone()
-                                defaults=Value::Null
+                                values=values.clone()
                                 refresh=data
                                 notice=notice
+                                saved="Defaults saved.".into()
                             />
                         </section>
                     }
                 })
         }}
         <div class="approval-list">
-            {move || {
-                let defaults = data.data.get()["settings"].clone();
-                data.data
-                    .get()["users"]
-                    .as_array()
-                    .cloned()
-                    .unwrap_or_default()
-                    .into_iter()
-                    .map(|user| {
-                        let id = user["id"].as_i64().unwrap_or(0);
-                        let status = text(&user, "status");
-                        let username = text(&user, "username");
-                        let confirm_name = username.clone();
-                        let own = me == Some(id);
-                        let sync = &user["last_sync"];
-                        let last_sync = if sync.is_null() {
-                            "never".into()
-                        } else {
-                            format!("{} {}", text(sync, "status"), day(&sync["at"]))
-                        };
-                        view! {
-                            <section class="panel admin-user" data-user=username.clone()>
-                                <div class="approval">
-                                    <div>
-                                        <h2>{username.clone()}</h2>
-                                        <span class="muted">
-                                            {format!(
-                                                "{} · {status} · Discogs ID {}",
-                                                text(&user, "role"),
-                                                user["discogs_id"].as_i64().unwrap_or(0),
-                                            )}
-                                        </span>
-                                    </div>
-                                    <div class="actions">
-                                        {match status.as_str() {
-                                            "pending" => {
-                                                view! {
-                                                    <MutationButton
-                                                        action=format!("/admin/users/{id}/approve")
-                                                        label="Approve"
-                                                        refresh=data
-                                                    />
-                                                    <MutationButton
-                                                        action=format!("/admin/users/{id}/reject")
-                                                        label="Reject"
-                                                        refresh=data
-                                                    />
-                                                }
-                                                    .into_any()
-                                            }
-                                            "rejected" => {
-                                                view! {
-                                                    <MutationButton
-                                                        action=format!("/admin/users/{id}/approve")
-                                                        label="Approve"
-                                                        refresh=data
-                                                    />
-                                                }
-                                                    .into_any()
-                                            }
-                                            "disabled" => {
-                                                view! {
-                                                    <MutationButton
-                                                        action=format!("/admin/users/{id}/enable")
-                                                        label="Enable"
-                                                        refresh=data
-                                                    />
-                                                }
-                                                    .into_any()
-                                            }
-                                            _ => ().into_any(),
-                                        }}
-                                        {(!own && status != "disabled")
-                                            .then(|| {
-                                                view! {
-                                                    <MutationButton
-                                                        action=format!("/admin/users/{id}/disable")
-                                                        label="Disable"
-                                                        refresh=data
-                                                    />
-                                                }
-                                            })}
-                                    </div>
-                                </div>
-                                <p class="muted">
-                                    {format!(
-                                        "Joined {} · Last login {} · {} items · Last sync {last_sync}",
-                                        day(&user["created_at"]),
-                                        day(&user["last_login_at"]),
-                                        user["items"].as_i64().unwrap_or(0),
-                                    )}
-                                </p>
-                                <IntervalsForm
-                                    action=format!("/admin/users/{id}/overrides")
-                                    values=user.clone()
-                                    defaults=defaults.clone()
-                                    refresh=data
-                                    notice=notice
-                                />
-                                {(!own)
-                                    .then(|| {
-                                        view! {
-                                            <DeleteUserForm id=id username=confirm_name refresh=data />
-                                        }
-                                    })}
-                            </section>
-                        }
-                    })
-                    .collect_view()
-            }}
+            <For
+                each=move || users.get()
+                key=|(key, _)| key.clone()
+                children=move |(_, user)| {
+                    view! { <UserCard user=user me=me defaults=settings.into() refresh=data notice=notice /> }
+                }
+            />
         </div>
+    }
+}
+
+#[component]
+fn UserCard(
+    user: Value,
+    me: Option<i64>,
+    defaults: Signal<Value>,
+    refresh: Remote,
+    notice: RwSignal<String>,
+) -> impl IntoView {
+    let id = user["id"].as_i64().unwrap_or(0);
+    let status = text(&user, "status");
+    let username = text(&user, "username");
+    let own = me == Some(id);
+    let sync = &user["last_sync"];
+    let last_sync = if sync.is_null() {
+        "never".into()
+    } else {
+        format!("{} {}", text(sync, "status"), day(&sync["at"]))
+    };
+    let summary = format!(
+        "{} · {status} · Discogs ID {}",
+        text(&user, "role"),
+        user["discogs_id"].as_i64().unwrap_or(0),
+    );
+    let activity = format!(
+        "Joined {} · Last login {} · {} items · Last sync {last_sync}",
+        day(&user["created_at"]),
+        day(&user["last_login_at"]),
+        user["items"].as_i64().unwrap_or(0),
+    );
+    let actions: &[(&str, &'static str)] = match status.as_str() {
+        "pending" => &[("approve", "Approve"), ("reject", "Reject")],
+        "rejected" => &[("approve", "Approve")],
+        "disabled" => &[("enable", "Enable")],
+        _ => &[],
+    };
+    let disable = !own && status != "disabled";
+    let saved = format!("Overrides saved for {username}.");
+    let heading = username.clone();
+    let confirm_name = username.clone();
+    view! {
+        <section class="panel admin-user" data-user=username>
+            <div class="approval">
+                <div>
+                    <h2>{heading}</h2>
+                    <span class="muted">{summary}</span>
+                </div>
+                <div class="actions">
+                    {actions
+                        .iter()
+                        .map(|(path, label)| {
+                            view! {
+                                <MutationButton
+                                    action=format!("/admin/users/{id}/{path}")
+                                    label=*label
+                                    refresh=refresh
+                                />
+                            }
+                        })
+                        .collect_view()}
+                    {disable
+                        .then(|| {
+                            view! {
+                                <MutationButton
+                                    action=format!("/admin/users/{id}/disable")
+                                    label="Disable"
+                                    refresh=refresh
+                                />
+                            }
+                        })}
+                </div>
+            </div>
+            <p class="muted">{activity}</p>
+            <IntervalsForm
+                action=format!("/admin/users/{id}/overrides")
+                values=user.clone()
+                defaults=defaults
+                refresh=refresh
+                notice=notice
+                saved=saved
+            />
+            {(!own).then(|| view! { <DeleteUserForm id=id username=confirm_name refresh=refresh /> })}
+        </section>
     }
 }
 
@@ -1318,9 +1311,10 @@ fn day(value: &Value) -> String {
 fn IntervalsForm(
     action: String,
     values: Value,
-    defaults: Value,
+    #[prop(optional, into)] defaults: Option<Signal<Value>>,
     refresh: Remote,
     notice: RwSignal<String>,
+    saved: String,
 ) -> impl IntoView {
     let field = |key: &str| {
         values[key]
@@ -1330,12 +1324,14 @@ fn IntervalsForm(
     };
     let sync = RwSignal::new(field("sync_interval_hours"));
     let prices = RwSignal::new(field("price_refresh_hours"));
-    let overrides = !defaults.is_null();
-    let placeholder = move |key: &str| {
-        defaults[key]
-            .as_i64()
-            .map(|v| format!("Default ({v})"))
-            .unwrap_or_default()
+    let overrides = defaults.is_some();
+    let placeholder = move |key: &'static str| {
+        move || {
+            defaults
+                .and_then(|d| d.get()[key].as_i64())
+                .map(|v| format!("Default ({v})"))
+                .unwrap_or_default()
+        }
     };
     let sync_placeholder = placeholder("sync_interval_hours");
     let prices_placeholder = placeholder("price_refresh_hours");
@@ -1362,10 +1358,11 @@ fn IntervalsForm(
                     ("price_refresh_hours".into(), prices.get_untracked()),
                 ];
                 let target = target.clone();
+                let saved = saved.clone();
                 leptos::task::spawn_local(async move {
                     match post(&target, fields).await {
                         Ok(()) => {
-                            notice.set(if overrides { "Overrides saved." } else { "Defaults saved." }.into());
+                            notice.set(saved);
                             refresh.revision.update(|r| *r += 1);
                         }
                         Err(e) => message.set(e),
