@@ -11,7 +11,7 @@ use axum::{
 use serde::Deserialize;
 use serde_json::{Value, json};
 use sqlx::{Postgres, QueryBuilder};
-use waxdemon_core::library::{LibraryItem, LibraryPage, LibraryQuery, Preferences};
+use waxdemon_core::library::{LibraryItem, LibraryPage, LibraryQuery};
 
 const ITEM_COLUMNS: &str = "i.instance_id,i.release_id,r.artist,r.title,r.year,r.format,COALESCE(NULLIF(r.genres,'')::jsonb,'[]'::jsonb) AS genres,COALESCE(NULLIF(r.styles,'')::jsonb,'[]'::jsonb) AS styles,r.cover_image_url,i.added_date,i.folder_id,i.rating,i.notes,i.condition,v.amount::text AS suggested_value,v.currency,COALESCE(i.last_value_check,p.fetched_at::text) AS last_value_check,p.condition AS estimate_condition";
 const ITEM_FROM: &str = " FROM user_collection_items i JOIN releases r ON r.id=i.release_id LEFT JOIN LATERAL (SELECT amount,currency,condition,fetched_at FROM user_price_suggestions WHERE user_id=i.user_id AND release_id=i.release_id AND i.suggested_value IS NULL AND NULLIF(trim(i.condition),'') IS NULL ORDER BY fetched_at DESC,currency,array_position(ARRAY['Mint (M)','Near Mint (NM or M-)','Very Good Plus (VG+)','Very Good (VG)','Good Plus (G+)','Good (G)','Fair (F)','Poor (P)'],condition),condition LIMIT 1) p ON true CROSS JOIN LATERAL (SELECT COALESCE(i.suggested_value,p.amount) AS amount,CASE WHEN i.suggested_value IS NOT NULL THEN i.currency ELSE p.currency END AS currency) v";
@@ -274,20 +274,16 @@ pub(super) async fn settings(
     auth: AuthSession,
 ) -> Result<Json<Value>, AuthError> {
     let user = approved(&auth)?.id;
-    let prefs:Option<Value>=sqlx::query_scalar("SELECT jsonb_build_object('sync_interval_hours',sync_interval_hours,'price_refresh_hours',price_refresh_hours,'display_currency',display_currency) FROM user_preferences WHERE user_id=$1")
-        .bind(user).fetch_optional(&state.pool).await?;
+    let prefs:Value=sqlx::query_scalar("SELECT jsonb_build_object('sync_interval_hours',COALESCE(p.sync_interval_hours,s.sync_interval_hours),'price_refresh_hours',COALESCE(p.price_refresh_hours,s.price_refresh_hours),'display_currency',p.display_currency) FROM app_settings s LEFT JOIN user_preferences p ON p.user_id=$1")
+        .bind(user).fetch_one(&state.pool).await?;
     let connection:Option<Value>=sqlx::query_scalar("SELECT jsonb_build_object('connected_at',connected_at,'updated_at',updated_at) FROM discogs_connections WHERE user_id=$1")
         .bind(user).fetch_optional(&state.pool).await?;
-    Ok(Json(
-        json!({"preferences":prefs.unwrap_or_else(||json!(Preferences::default())),"connection":connection}),
-    ))
+    Ok(Json(json!({"preferences":prefs,"connection":connection})))
 }
 
 #[derive(Deserialize)]
 struct SaveSettings {
     csrf: String,
-    sync_interval_hours: i32,
-    price_refresh_hours: i32,
     display_currency: Option<String>,
 }
 
@@ -300,11 +296,9 @@ async fn save_settings(
     let user = approved(&auth)?.id;
     check_csrf(&state, &auth.session, &headers, &input.csrf).await?;
     let currency = input.display_currency.filter(|v| !v.is_empty());
-    if !(0..=720).contains(&input.sync_interval_hours)
-        || !(1..=720).contains(&input.price_refresh_hours)
-        || currency
-            .as_ref()
-            .is_some_and(|v| v.len() != 3 || !v.bytes().all(|b| b.is_ascii_uppercase()))
+    if currency
+        .as_ref()
+        .is_some_and(|v| v.len() != 3 || !v.bytes().all(|b| b.is_ascii_uppercase()))
     {
         return Err(bad_request());
     }
@@ -317,8 +311,8 @@ async fn save_settings(
     if allowed.is_none() {
         return Err(AuthError::Forbidden);
     }
-    sqlx::query("INSERT INTO user_preferences (user_id,sync_interval_hours,price_refresh_hours,display_currency) VALUES ($1,$2,$3,$4) ON CONFLICT (user_id) DO UPDATE SET sync_interval_hours=EXCLUDED.sync_interval_hours,price_refresh_hours=EXCLUDED.price_refresh_hours,display_currency=EXCLUDED.display_currency")
-        .bind(user).bind(input.sync_interval_hours).bind(input.price_refresh_hours).bind(currency).execute(&mut *tx).await?;
+    sqlx::query("INSERT INTO user_preferences (user_id,display_currency) VALUES ($1,$2) ON CONFLICT (user_id) DO UPDATE SET display_currency=EXCLUDED.display_currency")
+        .bind(user).bind(currency).execute(&mut *tx).await?;
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
 }

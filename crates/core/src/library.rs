@@ -63,20 +63,3 @@ pub struct LibraryPage {
     pub page: u32,
     pub page_size: u32,
 }
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct Preferences {
-    pub sync_interval_hours: i32,
-    pub price_refresh_hours: i32,
-    pub display_currency: Option<String>,
-}
-
-impl Default for Preferences {
-    fn default() -> Self {
-        Self {
-            sync_interval_hours: 24,
-            price_refresh_hours: 24,
-            display_currency: None,
-        }
-    }
-}

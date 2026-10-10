@@ -108,7 +108,7 @@ async fn execute_inner(job: &SyncJob, state: &AuthState, task_id: &TaskId) -> an
     if !matches!(status.as_deref(), Some("queued" | "running")) {
         return Ok(());
     }
-    let owner: Option<SyncOwner> = sqlx::query_as("SELECT u.username,c.updated_at,c.key_id,c.nonce,c.ciphertext,COALESCE(p.price_refresh_hours,24) AS refresh_hours FROM users u JOIN discogs_connections c ON c.user_id=u.id LEFT JOIN user_preferences p ON p.user_id=u.id WHERE u.id=$1 AND u.status='approved'")
+    let owner: Option<SyncOwner> = sqlx::query_as("SELECT u.username,c.updated_at,c.key_id,c.nonce,c.ciphertext,COALESCE(p.price_refresh_hours,s.price_refresh_hours)::int AS refresh_hours FROM users u JOIN discogs_connections c ON c.user_id=u.id CROSS JOIN app_settings s LEFT JOIN user_preferences p ON p.user_id=u.id WHERE u.id=$1 AND u.status='approved'")
         .bind(job.user_id).fetch_optional(&mut connection).await?;
     let Some(owner) = owner else {
         cancel(&mut connection, job).await?;

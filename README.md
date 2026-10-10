@@ -52,7 +52,7 @@ Config is done via environment variables:
 
 Keyring JSON (64-character hex keys): `{"primary":"<openssl rand -hex 32 output>"}`.
 The first Discogs signup becomes the administrator. Later
-signups require administrator approval. Set per-user sync intervals in Settings.
+signups require administrator approval. Administrators set sync intervals in Admin.
 
 ## Architecture
 

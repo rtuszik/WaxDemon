@@ -62,7 +62,7 @@ pub fn router(state: AuthState) -> Router {
         .route("/api/sync", post(queue_sync))
         .route("/api/sync/status", get(sync_status))
         .route("/admin/users", get(super::ui::render))
-        .route("/api/admin/users", get(super::ui::pending_users))
+        .route("/api/admin/users", get(super::ui::admin_users))
         .nest_service(
             "/pkg",
             tower_http::services::ServeDir::new(format!("{}/pkg", state.leptos.site_root)),
@@ -80,6 +80,11 @@ pub fn router(state: AuthState) -> Router {
         )
         .route("/admin/users/{id}/approve", post(approve))
         .route("/admin/users/{id}/reject", post(reject))
+        .route("/admin/users/{id}/enable", post(enable))
+        .route("/admin/users/{id}/disable", post(disable))
+        .route("/admin/users/{id}/delete", post(delete_user))
+        .route("/admin/users/{id}/overrides", post(save_overrides))
+        .route("/admin/settings", post(save_admin_settings))
         .layer(DefaultBodyLimit::max(8192))
         .layer(middleware::from_fn(enforce_deadline))
         .layer(middleware::from_fn_with_state(
@@ -366,6 +371,13 @@ async fn delete_account(
             return Err(AuthError::LastAdmin);
         }
     }
+    remove_user(&mut tx, id).await?;
+    tx.commit().await?;
+    auth.logout().await.map_err(|_| AuthError::Internal)?;
+    Ok(Redirect::to("/auth/login"))
+}
+
+async fn remove_user(tx: &mut sqlx::PgConnection, id: i64) -> Result<(), AuthError> {
     sqlx::query("DELETE FROM app_sessions WHERE data->'axum-login.data'->>'user_id'=$1")
         .bind(id.to_string())
         .execute(&mut *tx)
@@ -374,9 +386,7 @@ async fn delete_account(
         .bind(id)
         .execute(&mut *tx)
         .await?;
-    tx.commit().await?;
-    auth.logout().await.map_err(|_| AuthError::Internal)?;
-    Ok(Redirect::to("/auth/login"))
+    Ok(())
 }
 
 pub(super) fn admin(auth: &AuthSession) -> Result<&User, AuthError> {
@@ -465,21 +475,14 @@ async fn decision(
     input: Mutation,
     id: i64,
     status: &str,
+    from: &[&str],
 ) -> Result<Redirect, AuthError> {
     check_csrf(&state, &auth.session, &headers, &input.csrf).await?;
     let actor = admin(&auth)?.id;
     let mut tx = state.pool.begin().await?;
-    let allowed: Option<i64> = sqlx::query_scalar(
-        "SELECT id FROM users WHERE id = $1 AND role = 'admin' AND status = 'approved' FOR UPDATE",
-    )
-    .bind(actor)
-    .fetch_optional(&mut *tx)
-    .await?;
-    if allowed.is_none() {
-        return Err(AuthError::Forbidden);
-    }
-    let result = sqlx::query("UPDATE users SET status = $2, session_revocation = CASE WHEN $2 = 'rejected' THEN gen_random_uuid() ELSE session_revocation END WHERE id = $1 AND status = 'pending'")
-        .bind(id).bind(status).execute(&mut *tx).await?;
+    lock_admin(&mut tx, actor).await?;
+    let result = sqlx::query("UPDATE users SET status = $2, session_revocation = CASE WHEN $2 = 'rejected' THEN gen_random_uuid() ELSE session_revocation END WHERE id = $1 AND status = ANY($3)")
+        .bind(id).bind(status).bind(from).execute(&mut *tx).await?;
     if result.rows_affected() != 1 {
         return Err(AuthError::Conflict);
     }
@@ -497,7 +500,16 @@ async fn approve(
     Path(id): Path<i64>,
     Form(input): Form<Mutation>,
 ) -> Result<Redirect, AuthError> {
-    decision(state, auth, headers, input, id, "approved").await
+    decision(
+        state,
+        auth,
+        headers,
+        input,
+        id,
+        "approved",
+        &["pending", "rejected"],
+    )
+    .await
 }
 
 async fn reject(
@@ -507,5 +519,148 @@ async fn reject(
     Path(id): Path<i64>,
     Form(input): Form<Mutation>,
 ) -> Result<Redirect, AuthError> {
-    decision(state, auth, headers, input, id, "rejected").await
+    decision(state, auth, headers, input, id, "rejected", &["pending"]).await
+}
+
+async fn enable(
+    State(state): State<AuthState>,
+    auth: AuthSession,
+    headers: HeaderMap,
+    Path(id): Path<i64>,
+    Form(input): Form<Mutation>,
+) -> Result<Redirect, AuthError> {
+    decision(state, auth, headers, input, id, "approved", &["disabled"]).await
+}
+
+async fn lock_admin(tx: &mut sqlx::PgConnection, actor: i64) -> Result<(), AuthError> {
+    let allowed: Option<i64> = sqlx::query_scalar(
+        "SELECT id FROM users WHERE id = $1 AND role = 'admin' AND status = 'approved' FOR UPDATE",
+    )
+    .bind(actor)
+    .fetch_optional(&mut *tx)
+    .await?;
+    allowed.map(|_| ()).ok_or(AuthError::Forbidden)
+}
+
+// Serialized with account deletion so admin counts stay consistent.
+async fn lock_target(
+    tx: &mut sqlx::PgConnection,
+    actor: i64,
+    target: i64,
+) -> Result<String, AuthError> {
+    if actor == target {
+        return Err(AuthError::Conflict);
+    }
+    sqlx::query("SELECT pg_advisory_xact_lock(-2)")
+        .execute(&mut *tx)
+        .await?;
+    lock_admin(tx, actor).await?;
+    sqlx::query_scalar("SELECT username FROM users WHERE id=$1 FOR UPDATE")
+        .bind(target)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(AuthError::NotFound)
+}
+
+async fn disable(
+    State(state): State<AuthState>,
+    auth: AuthSession,
+    headers: HeaderMap,
+    Path(id): Path<i64>,
+    Form(input): Form<Mutation>,
+) -> Result<Redirect, AuthError> {
+    check_csrf(&state, &auth.session, &headers, &input.csrf).await?;
+    let actor = admin(&auth)?.id;
+    let mut tx = state.pool.begin().await?;
+    lock_target(&mut tx, actor, id).await?;
+    let result = sqlx::query("UPDATE users SET status='disabled',session_revocation=gen_random_uuid() WHERE id=$1 AND status<>'disabled'")
+        .bind(id).execute(&mut *tx).await?;
+    if result.rows_affected() != 1 {
+        return Err(AuthError::Conflict);
+    }
+    sqlx::query("UPDATE user_sync_runs SET status='cancelled',phase='cancelled',error='Account disabled',finished_at=now() WHERE user_id=$1 AND status IN ('queued','running')")
+        .bind(id).execute(&mut *tx).await?;
+    tx.commit().await?;
+    Ok(Redirect::to("/admin/users"))
+}
+
+async fn delete_user(
+    State(state): State<AuthState>,
+    auth: AuthSession,
+    headers: HeaderMap,
+    Path(id): Path<i64>,
+    Form(input): Form<DeleteAccount>,
+) -> Result<Redirect, AuthError> {
+    check_csrf(&state, &auth.session, &headers, &input.csrf).await?;
+    let actor = admin(&auth)?.id;
+    let mut tx = state.pool.begin().await?;
+    if lock_target(&mut tx, actor, id).await? != input.confirm {
+        return Err(AuthError::InvalidInput);
+    }
+    remove_user(&mut tx, id).await?;
+    tx.commit().await?;
+    Ok(Redirect::to("/admin/users"))
+}
+
+#[derive(Deserialize)]
+struct Intervals {
+    csrf: String,
+    sync_interval_hours: String,
+    price_refresh_hours: String,
+}
+
+fn interval(value: &str, min: i32) -> Result<Option<i32>, AuthError> {
+    let value = value.trim();
+    if value.is_empty() {
+        return Ok(None);
+    }
+    value
+        .parse()
+        .ok()
+        .filter(|hours| (min..=720).contains(hours))
+        .map(Some)
+        .ok_or(AuthError::InvalidInput)
+}
+
+async fn save_admin_settings(
+    State(state): State<AuthState>,
+    auth: AuthSession,
+    headers: HeaderMap,
+    Form(input): Form<Intervals>,
+) -> Result<Redirect, AuthError> {
+    check_csrf(&state, &auth.session, &headers, &input.csrf).await?;
+    let actor = admin(&auth)?.id;
+    let sync = interval(&input.sync_interval_hours, 0)?.ok_or(AuthError::InvalidInput)?;
+    let prices = interval(&input.price_refresh_hours, 1)?.ok_or(AuthError::InvalidInput)?;
+    let mut tx = state.pool.begin().await?;
+    lock_admin(&mut tx, actor).await?;
+    sqlx::query("UPDATE app_settings SET sync_interval_hours=$1,price_refresh_hours=$2")
+        .bind(sync)
+        .bind(prices)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    Ok(Redirect::to("/admin/users"))
+}
+
+async fn save_overrides(
+    State(state): State<AuthState>,
+    auth: AuthSession,
+    headers: HeaderMap,
+    Path(id): Path<i64>,
+    Form(input): Form<Intervals>,
+) -> Result<Redirect, AuthError> {
+    check_csrf(&state, &auth.session, &headers, &input.csrf).await?;
+    let actor = admin(&auth)?.id;
+    let sync = interval(&input.sync_interval_hours, 0)?;
+    let prices = interval(&input.price_refresh_hours, 1)?;
+    let mut tx = state.pool.begin().await?;
+    lock_admin(&mut tx, actor).await?;
+    let result = sqlx::query("INSERT INTO user_preferences (user_id,sync_interval_hours,price_refresh_hours) SELECT id,$2,$3 FROM users WHERE id=$1 ON CONFLICT (user_id) DO UPDATE SET sync_interval_hours=EXCLUDED.sync_interval_hours,price_refresh_hours=EXCLUDED.price_refresh_hours")
+        .bind(id).bind(sync).bind(prices).execute(&mut *tx).await?;
+    if result.rows_affected() != 1 {
+        return Err(AuthError::NotFound);
+    }
+    tx.commit().await?;
+    Ok(Redirect::to("/admin/users"))
 }

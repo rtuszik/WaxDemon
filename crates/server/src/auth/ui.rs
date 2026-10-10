@@ -9,13 +9,14 @@ use leptos::{nonce::Nonce, prelude::*};
 use serde_json::{Value, json};
 use waxdemon_app::Bootstrap;
 
-pub(super) async fn pending_users(
+pub(super) async fn admin_users(
     State(state): State<AuthState>,
     auth: AuthSession,
 ) -> Result<Json<Value>, AuthError> {
     routes::admin(&auth)?;
-    let users:Vec<super::backend::User>=sqlx::query_as("SELECT id,discogs_id,username,role,status,session_revocation::text FROM users WHERE status='pending' ORDER BY created_at,id LIMIT 100").fetch_all(&state.pool).await?;
-    Ok(Json(json!({"users":users})))
+    let data: Value = sqlx::query_scalar("SELECT jsonb_build_object('settings',(SELECT jsonb_build_object('sync_interval_hours',sync_interval_hours,'price_refresh_hours',price_refresh_hours) FROM app_settings),'users',COALESCE(jsonb_agg(jsonb_build_object('id',u.id,'discogs_id',u.discogs_id,'username',u.username,'role',u.role,'status',u.status,'created_at',u.created_at,'last_login_at',u.last_login_at,'items',(SELECT count(*) FROM user_collection_items i WHERE i.user_id=u.id),'sync_interval_hours',p.sync_interval_hours,'price_refresh_hours',p.price_refresh_hours,'last_sync',(SELECT jsonb_build_object('status',r.status,'at',COALESCE(r.finished_at,r.created_at)) FROM user_sync_runs r WHERE r.user_id=u.id ORDER BY r.id DESC LIMIT 1)) ORDER BY u.status<>'pending',u.created_at,u.id),'[]'::jsonb)) FROM users u LEFT JOIN user_preferences p ON p.user_id=u.id")
+        .fetch_one(&state.pool).await?;
+    Ok(Json(data))
 }
 
 pub(super) async fn render(
@@ -89,7 +90,7 @@ pub(super) async fn render(
             ),
             "/admin/users" => (
                 "/api/admin/users".into(),
-                pending_users(State(state.clone()), auth.clone()).await?.0,
+                admin_users(State(state.clone()), auth.clone()).await?.0,
             ),
             _ if path.starts_with("/library/") => {
                 let id = path

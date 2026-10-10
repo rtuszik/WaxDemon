@@ -338,15 +338,15 @@ async fn upgrade_cleans_completed_import_without_overwriting_current_data() {
          SELECT id,10,42,'2026-01-01','Changed since import' FROM users;
          INSERT INTO user_collection_history (user_id,timestamp,total_items,value_median,currency)
          SELECT id,'2026-01-01',1,99,'EUR' FROM users;
-         INSERT INTO user_preferences (user_id,sync_interval_hours) SELECT id,48 FROM users;
+         INSERT INTO user_preferences (user_id,display_currency) SELECT id,'EUR' FROM users;
          INSERT INTO user_settings (user_id,key,value) SELECT id,'sync_status','idle' FROM users;
          INSERT INTO legacy_import (user_id,item_count,release_count,history_count,setting_count)
          SELECT id,3,2,2,2 FROM users;",
     ).execute(&pool).await.unwrap();
     waxdemon_db::run_migrations(&pool).await.unwrap();
     assert_legacy_tables_removed(&pool).await;
-    let current: (String, String, String, i32) = sqlx::query_as(
-        "SELECT r.title,i.notes,h.value_median::text,p.sync_interval_hours
+    let current: (String, String, String, String) = sqlx::query_as(
+        "SELECT r.title,i.notes,h.value_median::text,p.display_currency
          FROM user_collection_items i JOIN releases r ON r.id=i.release_id
          JOIN user_collection_history h ON h.user_id=i.user_id
          JOIN user_preferences p ON p.user_id=i.user_id",
@@ -360,7 +360,7 @@ async fn upgrade_cleans_completed_import_without_overwriting_current_data() {
             "Updated title".into(),
             "Changed since import".into(),
             "99".into(),
-            48
+            "EUR".into()
         )
     );
     let count: i64 = sqlx::query_scalar("SELECT item_count FROM legacy_import")

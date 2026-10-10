@@ -1067,18 +1067,13 @@ pub fn Settings() -> impl IntoView {
 
 #[component]
 fn PreferencesForm(preferences: Value) -> impl IntoView {
-    let sync = RwSignal::new(
-        preferences["sync_interval_hours"]
-            .as_i64()
-            .unwrap_or(24)
-            .to_string(),
-    );
-    let prices = RwSignal::new(
-        preferences["price_refresh_hours"]
-            .as_i64()
-            .unwrap_or(24)
-            .to_string(),
-    );
+    let sync = preferences["sync_interval_hours"].as_i64().unwrap_or(24);
+    let prices = preferences["price_refresh_hours"].as_i64().unwrap_or(24);
+    let schedule = if sync == 0 {
+        format!("Automatic sync is off. Cached prices refresh after {prices} hours.")
+    } else {
+        format!("Sync runs every {sync} hours. Cached prices refresh after {prices} hours.")
+    };
     let currency = RwSignal::new(text(&preferences, "display_currency"));
     let message = RwSignal::new(String::new());
     let busy = RwSignal::new(false);
@@ -1099,8 +1094,6 @@ fn PreferencesForm(preferences: Value) -> impl IntoView {
                     message.set(String::new());
                     let fields = vec![
                         ("csrf".into(), token.clone()),
-                        ("sync_interval_hours".into(), sync.get_untracked()),
-                        ("price_refresh_hours".into(), prices.get_untracked()),
                         ("display_currency".into(), currency.get_untracked()),
                     ];
                     leptos::task::spawn_local(async move {
@@ -1116,32 +1109,10 @@ fn PreferencesForm(preferences: Value) -> impl IntoView {
                 }
             >
                 <input name="csrf" type="hidden" value=csrf() />
-                <label>
-                    "Sync interval (hours)"
-                    <input
-                        name="sync_interval_hours"
-                        type="number"
-                        min="0"
-                        max="720"
-                        required
-                        value=move || sync.get()
-                        prop:value=move || sync.get()
-                        on:input=move |ev| sync.set(event_target_value(&ev))
-                    /><small>"24 is daily. Set 0 for manual sync only."</small>
-                </label>
-                <label>
-                    "Refresh cached prices after (hours)"
-                    <input
-                        name="price_refresh_hours"
-                        type="number"
-                        min="1"
-                        max="720"
-                        required
-                        value=move || prices.get()
-                        prop:value=move || prices.get()
-                        on:input=move |ev| prices.set(event_target_value(&ev))
-                    />
-                </label>
+                <p class="muted">
+                    {schedule}
+                    " An administrator manages these intervals."
+                </p>
                 <label>
                     "Preferred display currency"
                     <select
@@ -1187,19 +1158,38 @@ fn PreferencesForm(preferences: Value) -> impl IntoView {
 }
 
 #[component]
-pub fn Approvals() -> impl IntoView {
+pub fn Admin() -> impl IntoView {
     let data = remote(Signal::derive(|| "/api/admin/users".into()));
+    let me = use_context::<Bootstrap>()
+        .unwrap_or_default()
+        .user
+        .and_then(|u| u["id"].as_i64());
     view! {
         <div class="page-heading">
-            <div>
-                <h1>"Pending accounts"</h1>
-            </div>
+            <h1>"Administration"</h1>
         </div>
         <Status remote=data />
+        {move || {
+            let settings = data.data.get()["settings"].clone();
+            (!settings.is_null())
+                .then(|| {
+                    view! {
+                        <section class="panel">
+                            <h2>"Sync defaults"</h2>
+                            <IntervalsForm
+                                action="/admin/settings".into()
+                                values=settings.clone()
+                                defaults=Value::Null
+                                refresh=data
+                            />
+                        </section>
+                    }
+                })
+        }}
         <div class="approval-list">
             {move || {
-                data
-                    .data
+                let defaults = data.data.get()["settings"].clone();
+                data.data
                     .get()["users"]
                     .as_array()
                     .cloned()
@@ -1207,48 +1197,259 @@ pub fn Approvals() -> impl IntoView {
                     .into_iter()
                     .map(|user| {
                         let id = user["id"].as_i64().unwrap_or(0);
+                        let status = text(&user, "status");
+                        let username = text(&user, "username");
+                        let confirm_name = username.clone();
+                        let own = me == Some(id);
+                        let sync = &user["last_sync"];
+                        let last_sync = if sync.is_null() {
+                            "never".into()
+                        } else {
+                            format!("{} {}", text(sync, "status"), day(&sync["at"]))
+                        };
                         view! {
-                            <section class="panel approval">
-                                <div>
-                                    <h2>{text(&user, "username")}</h2>
-                                    <span class="muted">
-                                        {format!(
-                                            "Discogs ID {}",
-                                            user["discogs_id"].as_i64().unwrap_or(0),
-                                        )}
-                                    </span>
+                            <section class="panel admin-user" data-user=username.clone()>
+                                <div class="approval">
+                                    <div>
+                                        <h2>{username.clone()}</h2>
+                                        <span class="muted">
+                                            {format!(
+                                                "{} · {status} · Discogs ID {}",
+                                                text(&user, "role"),
+                                                user["discogs_id"].as_i64().unwrap_or(0),
+                                            )}
+                                        </span>
+                                    </div>
+                                    <div class="actions">
+                                        {match status.as_str() {
+                                            "pending" => {
+                                                view! {
+                                                    <MutationButton
+                                                        action=format!("/admin/users/{id}/approve")
+                                                        label="Approve"
+                                                        refresh=data
+                                                    />
+                                                    <MutationButton
+                                                        action=format!("/admin/users/{id}/reject")
+                                                        label="Reject"
+                                                        refresh=data
+                                                    />
+                                                }
+                                                    .into_any()
+                                            }
+                                            "rejected" => {
+                                                view! {
+                                                    <MutationButton
+                                                        action=format!("/admin/users/{id}/approve")
+                                                        label="Approve"
+                                                        refresh=data
+                                                    />
+                                                }
+                                                    .into_any()
+                                            }
+                                            "disabled" => {
+                                                view! {
+                                                    <MutationButton
+                                                        action=format!("/admin/users/{id}/enable")
+                                                        label="Enable"
+                                                        refresh=data
+                                                    />
+                                                }
+                                                    .into_any()
+                                            }
+                                            _ => ().into_any(),
+                                        }}
+                                        {(!own && status != "disabled")
+                                            .then(|| {
+                                                view! {
+                                                    <MutationButton
+                                                        action=format!("/admin/users/{id}/disable")
+                                                        label="Disable"
+                                                        refresh=data
+                                                    />
+                                                }
+                                            })}
+                                    </div>
                                 </div>
-                                <div class="actions">
-                                    <MutationButton
-                                        action=format!("/admin/users/{id}/approve")
-                                        label="Approve"
-                                        refresh=data
-                                    />
-                                    <MutationButton
-                                        action=format!("/admin/users/{id}/reject")
-                                        label="Reject"
-                                        refresh=data
-                                    />
-                                </div>
+                                <p class="muted">
+                                    {format!(
+                                        "Joined {} · Last login {} · {} items · Last sync {last_sync}",
+                                        day(&user["created_at"]),
+                                        day(&user["last_login_at"]),
+                                        user["items"].as_i64().unwrap_or(0),
+                                    )}
+                                </p>
+                                <IntervalsForm
+                                    action=format!("/admin/users/{id}/overrides")
+                                    values=user.clone()
+                                    defaults=defaults.clone()
+                                    refresh=data
+                                />
+                                {(!own)
+                                    .then(|| {
+                                        view! {
+                                            <DeleteUserForm id=id username=confirm_name refresh=data />
+                                        }
+                                    })}
                             </section>
                         }
                     })
                     .collect_view()
             }}
         </div>
-        {move || {
-            data
-                .data
-                .get()["users"]
-                .as_array()
-                .filter(|u| u.is_empty())
-                .map(|_| {
-                    view! {
-                        <section class="empty panel">
-                            <p>"No accounts are waiting for approval."</p>
-                        </section>
+    }
+}
+
+fn day(value: &Value) -> String {
+    value
+        .as_str()
+        .and_then(|v| v.get(..10))
+        .unwrap_or("never")
+        .into()
+}
+
+#[component]
+fn IntervalsForm(action: String, values: Value, defaults: Value, refresh: Remote) -> impl IntoView {
+    let field = |key: &str| {
+        values[key]
+            .as_i64()
+            .map(|v| v.to_string())
+            .unwrap_or_default()
+    };
+    let sync = RwSignal::new(field("sync_interval_hours"));
+    let prices = RwSignal::new(field("price_refresh_hours"));
+    let overrides = !defaults.is_null();
+    let placeholder = move |key: &str| {
+        defaults[key]
+            .as_i64()
+            .map(|v| format!("Default ({v})"))
+            .unwrap_or_default()
+    };
+    let sync_placeholder = placeholder("sync_interval_hours");
+    let prices_placeholder = placeholder("price_refresh_hours");
+    let message = RwSignal::new(String::new());
+    let busy = RwSignal::new(false);
+    let token = csrf();
+    let target = action.clone();
+    view! {
+        <form
+            class="settings-form"
+            method="post"
+            action=action
+            on:submit=move |event| {
+                event.prevent_default();
+                if busy.get_untracked() {
+                    return;
+                }
+                busy.set(true);
+                message.set(String::new());
+                let fields = vec![
+                    ("csrf".into(), token.clone()),
+                    ("sync_interval_hours".into(), sync.get_untracked()),
+                    ("price_refresh_hours".into(), prices.get_untracked()),
+                ];
+                let target = target.clone();
+                leptos::task::spawn_local(async move {
+                    match post(&target, fields).await {
+                        Ok(()) => {
+                            message.set("Saved.".into());
+                            refresh.revision.update(|r| *r += 1);
+                        }
+                        Err(e) => message.set(e),
                     }
-                })
-        }}
+                    busy.set(false);
+                });
+            }
+        >
+            <input name="csrf" type="hidden" value=csrf() />
+            <label>
+                "Sync interval (hours)"
+                <input
+                    name="sync_interval_hours"
+                    type="number"
+                    min="0"
+                    max="720"
+                    required=!overrides
+                    placeholder=sync_placeholder
+                    value=move || sync.get()
+                    prop:value=move || sync.get()
+                    on:input=move |ev| sync.set(event_target_value(&ev))
+                /><small>"24 is daily. Set 0 for manual sync only."</small>
+            </label>
+            <label>
+                "Refresh cached prices after (hours)"
+                <input
+                    name="price_refresh_hours"
+                    type="number"
+                    min="1"
+                    max="720"
+                    required=!overrides
+                    placeholder=prices_placeholder
+                    value=move || prices.get()
+                    prop:value=move || prices.get()
+                    on:input=move |ev| prices.set(event_target_value(&ev))
+                /> {overrides.then_some(view! { <small>"Leave empty to use the default."</small> })}
+            </label>
+            <button disabled=move || {
+                busy.get()
+            }>{if overrides { "Save overrides" } else { "Save defaults" }}</button>
+            <p role="status">{move || message.get()}</p>
+        </form>
+    }
+}
+
+#[component]
+fn DeleteUserForm(id: i64, username: String, refresh: Remote) -> impl IntoView {
+    let confirm = RwSignal::new(String::new());
+    let error = RwSignal::new(String::new());
+    let busy = RwSignal::new(false);
+    let token = csrf();
+    let action = format!("/admin/users/{id}/delete");
+    let target = action.clone();
+    view! {
+        <div class="danger">
+            <form
+                method="post"
+                action=action
+                on:submit=move |event| {
+                    event.prevent_default();
+                    if busy.get_untracked() {
+                        return;
+                    }
+                    busy.set(true);
+                    error.set(String::new());
+                    let fields = vec![
+                        ("csrf".into(), token.clone()),
+                        ("confirm".into(), confirm.get_untracked()),
+                    ];
+                    let target = target.clone();
+                    leptos::task::spawn_local(async move {
+                        match post(&target, fields).await {
+                            Ok(()) => refresh.revision.update(|r| *r += 1),
+                            Err(e) => error.set(e),
+                        }
+                        busy.set(false);
+                    });
+                }
+            >
+                <input name="csrf" type="hidden" value=csrf() />
+                <label>
+                    {format!("Type {username} to delete this account and all its data")}
+                    <input
+                        name="confirm"
+                        required
+                        autocomplete="off"
+                        prop:value=move || confirm.get()
+                        on:input=move |ev| confirm.set(event_target_value(&ev))
+                    />
+                </label>
+                <button class="danger-button" disabled=move || busy.get()>
+                    "Delete user"
+                </button>
+                <span class="error" role="status">
+                    {move || error.get()}
+                </span>
+            </form>
+        </div>
     }
 }
