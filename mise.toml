@@ -8,7 +8,7 @@ cocogitto = "7.0.0"
 "npm:squawk-cli" = "latest"
 opengrep = "latest"
 oxfmt = "0.66.0"
-rust = "1.98.1"
+rust = "1.99.0"
 rust-analyzer = "latest"
 zizmor = "latest"
 
