@@ -53,7 +53,7 @@ url = "https://github.com/cocogitto/cocogitto/releases/download/7.0.0/cocogitto-
 url_api = "https://api.github.com/repos/cocogitto/cocogitto/releases/assets/366659399"
 
 [[tools."npm:squawk-cli"]]
-version = "2.68.0"
+version = "2.70.0"
 backend = "npm:squawk-cli"
 specifiers = ["latest"]
 
