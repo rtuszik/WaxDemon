@@ -47,7 +47,7 @@ sqlx.workspace = true
 async-trait.workspace = true
 subtle = "2.6.1"
 hex = "0.4.3"
-apalis = { version = "0.7.4", features = ["limit", "retry", "catch-panic"] }
+apalis = { version = "1.0.0", features = ["limit", "retry", "catch-panic"] }
 apalis-sql = { version = "0.7.4", features = ["postgres", "tokio-comp"] }
 leptos_axum.workspace = true
 waxdemon-app = { version = "1.10.0", path = "../app", features = ["ssr"] }
