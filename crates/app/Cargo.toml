@@ -22,7 +22,7 @@ serde.workspace = true
 serde_json.workspace = true
 url.workspace = true
 wasm-bindgen.workspace = true
-gloo-net = "0.7.0"
+gloo-net = "0.8.0"
 serde-wasm-bindgen = "0.6.5"
 js-sys = "0.3"
 web-sys = { version = "0.3.95", features = ["ResizeObserver", "Element"] }
