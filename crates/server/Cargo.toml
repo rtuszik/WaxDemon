@@ -42,7 +42,7 @@ rpassword = { version = "7.5.4" }
 axum-login = "0.18.0"
 sha2 = "0.11.0"
 time = "0.3.55"
-tower-sessions = { version = "0.14.0", default-features = false, features = ["axum-core"] }
+tower-sessions = { version = "0.15.0", default-features = false, features = ["axum-core"] }
 sqlx.workspace = true
 async-trait.workspace = true
 subtle = "2.6.1"
