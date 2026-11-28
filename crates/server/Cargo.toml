@@ -39,7 +39,7 @@ url = { workspace = true }
 chacha20poly1305 = { version = "0.11.0", features = ["zeroize"] }
 secrecy = { version = "0.10.3", features = ["serde"] }
 rpassword = { version = "7.5.4" }
-axum-login = "0.18.0"
+axum-login = "0.19.0"
 sha2 = "0.11.0"
 time = "0.3.55"
 tower-sessions = { version = "0.14.0", default-features = false, features = ["axum-core"] }
